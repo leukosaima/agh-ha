@@ -30,8 +30,8 @@ A .NET 9 Docker container application that provides high availability for AdGuar
 ### 1. Clone and Configure
 
 ```bash
-git clone <repository-url>
-cd AdGuardHomeHA
+git clone https://github.com/leukosaima/agh-ha.git
+cd agh-ha
 
 # Copy and customize configuration files
 cp .env.example .env

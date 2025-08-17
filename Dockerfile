@@ -1,29 +1,30 @@
 # Build stage
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 WORKDIR /src
 
 # Copy project file and restore dependencies
 COPY AdGuardHomeHA.csproj .
 RUN dotnet restore "AdGuardHomeHA.csproj"
 
-# Copy source code and build
+# Copy source code and publish with optimizations
 COPY . .
-RUN dotnet build "AdGuardHomeHA.csproj" -c Release -o /app/build --no-restore
+RUN dotnet publish "AdGuardHomeHA.csproj" \
+    -c Release \
+    --no-restore \
+    -o /app/publish
 
-# Publish stage
-FROM build AS publish
-RUN dotnet publish "AdGuardHomeHA.csproj" -c Release -o /app/publish --no-build --no-restore
+# Runtime stage - .NET runtime image (needed for framework-dependent deployment)
+FROM mcr.microsoft.com/dotnet/runtime:9.0-alpine AS final
 
-# Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
-
-# Create non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+# Install dependencies and create non-root user
+RUN apk add --no-cache icu-libs \
+    && addgroup -g 1001 -S appuser \
+    && adduser -S -D -H -u 1001 -h /app -s /sbin/nologin -G appuser appuser
 
 WORKDIR /app
 
 # Copy published app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
 # Create directory for configuration and set ownership
 RUN mkdir -p /app/config && chown -R appuser:appuser /app
@@ -33,7 +34,7 @@ USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD ps aux | grep -q '[A]dGuardHomeHA' || exit 1
+    CMD pgrep -f AdGuardHomeHA || exit 1
 
 # Environment variables
 ENV DOTNET_RUNNING_IN_CONTAINER=true
