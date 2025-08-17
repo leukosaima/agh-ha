@@ -1,0 +1,42 @@
+using System.Text.Json.Serialization;
+
+namespace AdGuardHomeHA.Models;
+
+public class LoginRequest
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("password")]
+    public string Password { get; set; } = string.Empty;
+}
+
+public class RewriteEntry
+{
+    [JsonPropertyName("domain")]
+    public string Domain { get; set; } = string.Empty;
+
+    [JsonPropertyName("answer")]
+    public string Answer { get; set; } = string.Empty;
+}
+
+public class RewriteRequest
+{
+    [JsonPropertyName("target")]
+    public RewriteEntry Target { get; set; } = new();
+}
+
+public class RewritesResponse
+{
+    [JsonPropertyName("domain_rewrites")]
+    public RewriteEntry[]? DomainRewrites { get; set; }
+}
+
+public class StatusResponse
+{
+    [JsonPropertyName("running")]
+    public bool Running { get; set; }
+
+    [JsonPropertyName("version")]
+    public string? Version { get; set; }
+}

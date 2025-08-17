@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  adguard-home-ha:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: adguard-home-ha:latest
+    container_name: adguard-home-ha
+    restart: unless-stopped
+    
+    # Network configuration
+    networks:
+      - default
+    
+    # Environment variables (override configuration)
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+      - TZ=UTC
+      
+      # AdGuard Home Configuration (optional override via env vars)
+      - AdGuardHomeHA__AdGuardHome__BaseUrl=${ADGUARD_BASE_URL:-http://adguard-home:3000}
+      - AdGuardHomeHA__AdGuardHome__Username=${ADGUARD_USERNAME:-admin}
+      - AdGuardHomeHA__AdGuardHome__Password=${ADGUARD_PASSWORD}
+      
+      # Monitoring Configuration
+      - AdGuardHomeHA__Monitoring__CheckIntervalSeconds=${CHECK_INTERVAL_SECONDS:-30}
+      - AdGuardHomeHA__Monitoring__RetryAttempts=${RETRY_ATTEMPTS:-3}
+      - AdGuardHomeHA__Monitoring__RetryDelayMs=${RETRY_DELAY_MS:-1000}
+    
+    # Mount configuration file (optional)
+    volumes:
+      - ./config/appsettings.production.json:/app/appsettings.Production.json:ro
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "ps", "aux", "|", "grep", "-q", "[A]dGuardHomeHA"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp:noexec,nosuid,size=32m
+
+# Optional: if you want to include AdGuard Home in the same compose file
+#  adguard-home:
+#    image: adguard/adguardhome:latest
+#    container_name: adguard-home
+#    restart: unless-stopped
+#    ports:
+#      - "53:53/tcp"
+#      - "53:53/udp"
+#      - "3000:3000/tcp"  # Web interface
+#    volumes:
+#      - ./adguard-home/work:/opt/adguardhome/work
+#      - ./adguard-home/conf:/opt/adguardhome/conf
+#    networks:
+#      - default
+
+networks:
+  default:
+    name: adguard-home-ha-network
+    driver: bridge
