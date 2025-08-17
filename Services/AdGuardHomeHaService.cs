@@ -127,7 +127,7 @@ public class AdGuardHomeHaService : BackgroundService
             }
 
             // Update DNS rewrites to point to the best available machine
-            await UpdateDnsTobestAvailableMachine();
+            await UpdateDnsToBestAvailableMachine();
         }
         catch (Exception ex)
         {
@@ -143,7 +143,7 @@ public class AdGuardHomeHaService : BackgroundService
                 machineName, isHealthy ? "healthy" : "unhealthy");
 
             // When a machine status changes, immediately update DNS to the best available machine
-            await UpdateDnsTobestAvailableMachine();
+            await UpdateDnsToBestAvailableMachine();
         }
         catch (Exception ex)
         {
@@ -151,7 +151,7 @@ public class AdGuardHomeHaService : BackgroundService
         }
     }
 
-    private async Task UpdateDnsTobestAvailableMachine()
+    private async Task UpdateDnsToBestAvailableMachine()
     {
         try
         {

@@ -1,4 +1,4 @@
-using System.Net.NetworkInformation;
+using System.Diagnostics;
 using AdGuardHomeHA.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -56,31 +56,21 @@ public class MachineHealthMonitor : IMachineHealthMonitor
             _logger.LogDebug("Checking health of machine {MachineName} at {IpAddress}", 
                 machine.Name, machine.IpAddress);
 
-            using var ping = new Ping();
-            var options = new PingOptions
-            {
-                DontFragment = true
-            };
-
             for (int attempt = 1; attempt <= _config.Monitoring.RetryAttempts; attempt++)
             {
                 try
                 {
-                    var reply = await ping.SendPingAsync(
-                        machine.IpAddress,
-                        machine.TimeoutMs,
-                        new byte[32], // Small payload
-                        options);
-
-                    if (reply.Status == IPStatus.Success)
+                    var isReachable = await PingHostAsync(machine.IpAddress, machine.TimeoutMs);
+                    
+                    if (isReachable)
                     {
-                        _logger.LogDebug("Machine {MachineName} is healthy (RTT: {RoundTripTime}ms)",
-                            machine.Name, reply.RoundtripTime);
+                        _logger.LogDebug("Machine {MachineName} is healthy (ping successful)",
+                            machine.Name);
                         return true;
                     }
 
-                    _logger.LogDebug("Ping attempt {Attempt} failed for {MachineName}: {Status}",
-                        attempt, machine.Name, reply.Status);
+                    _logger.LogDebug("Ping attempt {Attempt} failed for {MachineName}",
+                        attempt, machine.Name);
                 }
                 catch (Exception ex)
                 {
@@ -103,6 +93,49 @@ public class MachineHealthMonitor : IMachineHealthMonitor
         {
             _logger.LogError(ex, "Error checking health of machine {MachineName} at {IpAddress}",
                 machine.Name, machine.IpAddress);
+            return false;
+        }
+    }
+    
+    private async Task<bool> PingHostAsync(string hostAddress, int timeoutMs)
+    {
+        try
+        {
+            using var process = new Process();
+            process.StartInfo.FileName = "ping";
+            process.StartInfo.Arguments = $"-c 1 -W {timeoutMs / 1000} {hostAddress}"; // -c 1: send 1 packet, -W: timeout in seconds
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.RedirectStandardError = true;
+            process.StartInfo.CreateNoWindow = true;
+
+            process.Start();
+            
+            // Set a timeout slightly longer than the ping timeout
+            var timeoutTask = Task.Delay(timeoutMs + 1000);
+            var processTask = process.WaitForExitAsync();
+            
+            var completedTask = await Task.WhenAny(processTask, timeoutTask);
+            
+            if (completedTask == timeoutTask)
+            {
+                // Process timed out
+                try
+                {
+                    process.Kill();
+                }
+                catch
+                {
+                    // Ignore kill errors
+                }
+                return false;
+            }
+            
+            return process.ExitCode == 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug("Error executing ping command: {Error}", ex.Message);
             return false;
         }
     }

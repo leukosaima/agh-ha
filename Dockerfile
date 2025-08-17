@@ -17,7 +17,8 @@ RUN dotnet publish "AdGuardHomeHA.csproj" \
 FROM mcr.microsoft.com/dotnet/runtime:9.0-alpine AS final
 
 # Install dependencies and create non-root user
-RUN apk add --no-cache icu-libs \
+# iputils-ping installs a proper ping binary with setuid root
+RUN apk add --no-cache icu-libs iputils \
     && addgroup -g 1001 -S appuser \
     && adduser -S -D -H -u 1001 -h /app -s /sbin/nologin -G appuser appuser
 
