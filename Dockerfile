@@ -43,8 +43,6 @@ ENV DOTNET_EnableDiagnostics=0
 
 # Expose no ports (this is an internal service)
 
-# Add capability for ping (ICMP) functionality
-# Note: This requires --cap-add=NET_RAW when running the container
-
 # Run the application
 ENTRYPOINT ["dotnet", "AdGuardHomeHA.dll"]
+
