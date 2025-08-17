@@ -60,6 +60,8 @@ services:
     # Security
     security_opt:
       - no-new-privileges:true
+    cap_add:
+      - NET_RAW  # Required for ping (ICMP) functionality
     read_only: false
     tmpfs:
       - /tmp:noexec,nosuid,size=32m

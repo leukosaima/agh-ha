@@ -34,7 +34,6 @@ public class AdGuardHomeClient : IAdGuardHomeClient
         _config = appConfig.Value.AdGuardHome;
         
         _httpClient.BaseAddress = new Uri(_config.BaseUrl);
-        _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
     public async Task<bool> TestConnectionAsync()
@@ -88,8 +87,8 @@ public class AdGuardHomeClient : IAdGuardHomeClient
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                var rewritesResponse = JsonSerializer.Deserialize<RewritesResponse>(content);
-                return rewritesResponse?.DomainRewrites ?? Array.Empty<RewriteEntry>();
+                var rewriteEntries = JsonSerializer.Deserialize<RewriteEntry[]>(content);
+                return rewriteEntries ?? Array.Empty<RewriteEntry>();
             }
             
             _logger.LogWarning("Failed to get rewrites: {StatusCode}", response.StatusCode);
@@ -118,7 +117,8 @@ public class AdGuardHomeClient : IAdGuardHomeClient
             };
 
             var json = JsonSerializer.Serialize(rewrite);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var content = new StringContent(json, Encoding.UTF8);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             
             var response = await _httpClient.PostAsync("/control/rewrite/add", content);
             
@@ -155,7 +155,8 @@ public class AdGuardHomeClient : IAdGuardHomeClient
             };
 
             var json = JsonSerializer.Serialize(rewrite);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var content = new StringContent(json, Encoding.UTF8);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             
             var response = await _httpClient.PostAsync("/control/rewrite/delete", content);
             
@@ -244,11 +245,22 @@ public class AdGuardHomeClient : IAdGuardHomeClient
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
             var json = JsonSerializer.Serialize(loginRequest, jsonOptions);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var content = new StringContent(json, Encoding.UTF8);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             
             _logger.LogDebug("Login request JSON: {Json}", json);
+            _logger.LogDebug("JSON length: {Length} bytes", json.Length);
+            _logger.LogDebug("Content-Type: {ContentType}", content.Headers.ContentType?.ToString());
             
             _logger.LogDebug("Sending login request to /control/login");
+            
+            // Log all request headers
+            _logger.LogDebug("Request headers:");
+            foreach (var header in _httpClient.DefaultRequestHeaders)
+            {
+                _logger.LogDebug("  {HeaderName}: {HeaderValue}", header.Key, string.Join(", ", header.Value));
+            }
+            
             var response = await _httpClient.PostAsync("/control/login", content);
             
             _logger.LogDebug("Login response status: {StatusCode}", response.StatusCode);
