@@ -20,18 +20,6 @@ public class RewriteEntry
     public string Answer { get; set; } = string.Empty;
 }
 
-public class RewriteRequest
-{
-    [JsonPropertyName("target")]
-    public RewriteEntry Target { get; set; } = new();
-}
-
-public class RewritesResponse
-{
-    [JsonPropertyName("domain_rewrites")]
-    public RewriteEntry[]? DomainRewrites { get; set; }
-}
-
 public class StatusResponse
 {
     [JsonPropertyName("running")]

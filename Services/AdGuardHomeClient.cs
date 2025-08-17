@@ -111,10 +111,7 @@ public class AdGuardHomeClient : IAdGuardHomeClient
                 return false;
             }
 
-            var rewrite = new RewriteRequest
-            {
-                Target = new RewriteEntry { Domain = domain, Answer = ipAddress }
-            };
+            var rewrite = new RewriteEntry { Domain = domain, Answer = ipAddress };
 
             var json = JsonSerializer.Serialize(rewrite);
             var content = new StringContent(json, Encoding.UTF8);
@@ -149,10 +146,7 @@ public class AdGuardHomeClient : IAdGuardHomeClient
                 return false;
             }
 
-            var rewrite = new RewriteRequest
-            {
-                Target = new RewriteEntry { Domain = domain, Answer = ipAddress }
-            };
+            var rewrite = new RewriteEntry { Domain = domain, Answer = ipAddress };
 
             var json = JsonSerializer.Serialize(rewrite);
             var content = new StringContent(json, Encoding.UTF8);
