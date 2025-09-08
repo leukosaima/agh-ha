@@ -37,13 +37,14 @@
       },
       {
         "Name": "Database Service",
-        "MonitoringMode": "Webhook",
+        "MonitoringMode": "Gatus",
         "IpAddress": "192.168.1.102",
         "Priority": 3,
         "DnsRewrites": [
           "db.yourdomain.com"
         ],
         "GatusEndpointNames": ["gatus-db-1", "gatus-db-2"],
+        "GatusInstanceUrls": ["http://gatus-1:8080", "http://gatus-2:8080"],
         "RequiredGatusEndpoints": 1
       }
     ],
@@ -52,12 +53,9 @@
       "RetryAttempts": 3,
       "RetryDelayMs": 1000
     },
-    "Webhook": {
-      "Enabled": true,
-      "Port": 8080,
-      "Path": "/webhook",
-      "HealthStatusTimeoutSeconds": 300,
-      "AuthToken": "your-webhook-auth-token-here"
+    "GatusPolling": {
+      "IntervalSeconds": 30,
+      "TimeoutSeconds": 10
     }
   }
 }

@@ -261,11 +261,14 @@ public class AdGuardHomeHaService : BackgroundService
                 if (service.TimeoutMs <= 0)
                     errors.Add($"Services[{i}]:TimeoutMs must be greater than 0");
                     
-                // Validate webhook-specific settings
-                if (service.MonitoringMode == HealthSource.Webhook)
+                // Validate Gatus-specific settings
+                if (service.MonitoringMode == HealthSource.Gatus)
                 {
                     if (service.GatusEndpointNames == null || service.GatusEndpointNames.Length == 0)
-                        errors.Add($"Services[{i}]:GatusEndpointNames is required for webhook monitoring");
+                        errors.Add($"Services[{i}]:GatusEndpointNames is required for Gatus monitoring");
+                        
+                    if (service.GatusInstanceUrls == null || service.GatusInstanceUrls.Length == 0)
+                        errors.Add($"Services[{i}]:GatusInstanceUrls is required for Gatus monitoring");
                         
                     if (service.RequiredGatusEndpoints <= 0)
                         errors.Add($"Services[{i}]:RequiredGatusEndpoints must be greater than 0");

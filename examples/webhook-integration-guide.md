@@ -1,39 +1,27 @@
-# Gatus Webhook Integration Guide
+# Gatus Integration Guide
 
-This guide covers everything you need to know about integrating Gatus with AdGuard Home HA, including the new per-endpoint timeout tracking feature.
+This guide covers everything you need to know about integrating Gatus with AdGuard Home HA using active polling.
 
 ## Quick Start
 
-1. **Configure webhook in Gatus** → Send health alerts to AdGuard Home HA
-2. **Configure services in AdGuard Home HA** → Map Gatus endpoints to DNS rewrites
-3. **Enable per-endpoint timeout tracking** → Detect silent failures when Gatus machines crash
+1. **Configure endpoints in Gatus** → Set up health monitoring endpoints
+2. **Configure services in AdGuard Home HA** → Map Gatus endpoints to DNS rewrites and specify Gatus instance URLs
+3. **AdGuard Home HA polls Gatus API** → Continuously checks endpoint health status
 
-## Webhook Payload Structure
+## How It Works
 
-Gatus sends webhook payloads in this format:
+AdGuard Home HA actively polls Gatus instances using the Gatus API:
 
-```json
-{
-  "endpointName": "primary-web-check",
-  "endpointGroup": "production",
-  "endpointURL": "http://192.168.1.100:8080/health",
-  "conditionResults": [
-    {
-      "condition": "[STATUS] == 200",
-      "success": true
-    }
-  ],
-  "success": true,
-  "timestamp": "2025-01-08T12:00:00Z",
-  "message": "All conditions have been met"
-}
-```
+1. **Polling**: AdGuard Home HA makes HTTP requests to `http://gatus-instance:8080/api/v1/endpoints/statuses`
+2. **Status Parsing**: Gatus returns endpoint statuses in JSON format
+3. **Health Calculation**: AdGuard Home HA aggregates endpoint health based on `RequiredGatusEndpoints` threshold
+4. **DNS Updates**: DNS rewrites are updated when service health changes
 
 ## Configuration
 
 ### AdGuard Home HA Configuration
 
-Configure services in `appsettings.json` with webhook monitoring:
+Configure services in `appsettings.json` with Gatus polling:
 
 ```json
 {
@@ -41,28 +29,28 @@ Configure services in `appsettings.json` with webhook monitoring:
     "Services": [
       {
         "Name": "Web Service",
-        "MonitoringMode": "Webhook",
+        "MonitoringMode": "Gatus",
         "IpAddress": "192.168.1.100",
         "Priority": 1,
         "DnsRewrites": ["web.example.com"],
         "GatusEndpointNames": ["primary-web-check", "secondary-web-check"],
+        "GatusInstanceUrls": ["http://gatus-1:8080", "http://gatus-2:8080"],
         "RequiredGatusEndpoints": 1
       },
       {
         "Name": "Backup Web Service",
-        "MonitoringMode": "Webhook",
+        "MonitoringMode": "Gatus",
         "IpAddress": "192.168.1.101",
         "Priority": 2,
         "DnsRewrites": ["web.example.com"],
         "GatusEndpointNames": ["backup-web-check"],
+        "GatusInstanceUrls": ["http://gatus-1:8080"],
         "RequiredGatusEndpoints": 1
       }
     ],
-    "Webhook": {
-      "Enabled": true,
-      "Port": 8080,
-      "HealthStatusTimeoutSeconds": 180,
-      "AuthToken": "your-secure-token-here"
+    "GatusPolling": {
+      "IntervalSeconds": 30,
+      "TimeoutSeconds": 10
     }
   }
 }
@@ -70,52 +58,39 @@ Configure services in `appsettings.json` with webhook monitoring:
 
 **Configuration Notes:**
 - `RequiredGatusEndpoints`: At least 1 out of 2 endpoints must be healthy for Web Service
+- `GatusInstanceUrls`: URLs of Gatus instances to poll for endpoint statuses
 - `DnsRewrites`: Both services manage the same DNS entry for failover capability
-- `HealthStatusTimeoutSeconds`: 3 minutes per-endpoint timeout for stale detection
+- `IntervalSeconds`: How often to poll Gatus instances (default: 30 seconds)
 
 ### Gatus Configuration
 
 **Primary Gatus Machine:**
 ```yaml
-webhooks:
-  - name: "adguard-home-ha"
-    url: "http://adguard-home-ha:8080/webhook"
-    method: POST
-    headers:
-      Authorization: "Bearer your-secure-token-here"
-
 endpoints:
   - name: "primary-web-check"  # Must match GatusEndpointNames
     url: "http://192.168.1.100:8080/health"
     interval: 30s
-    alerts:
-      - type: webhook
-        webhooks: ["adguard-home-ha"]
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 2000"
         
   - name: "backup-web-check"
     url: "http://192.168.1.101:8080/health"
     interval: 30s
-    alerts:
-      - type: webhook
-        webhooks: ["adguard-home-ha"]
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 2000"
 ```
 
 **Secondary Gatus Machine (for redundancy):**
 ```yaml
-webhooks:
-  - name: "adguard-home-ha"
-    url: "http://adguard-home-ha:8080/webhook"
-    method: POST
-    headers:
-      Authorization: "Bearer your-secure-token-here"
-
 endpoints:
   - name: "secondary-web-check"  # Must match GatusEndpointNames
     url: "http://192.168.1.100:8080/health"  # Same service, different monitor
     interval: 30s
-    alerts:
-      - type: webhook
-        webhooks: ["adguard-home-ha"]
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 2000"
 ```
 
 ## Per-Endpoint Timeout Tracking

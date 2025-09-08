@@ -13,12 +13,12 @@ A .NET 9 Docker container application that provides high availability for AdGuar
 
 ### Monitoring Modes
 - **Ping Monitoring**: Traditional ICMP ping-based health checking (simple setup)
-- **Webhook Monitoring**: Advanced Gatus integration with per-endpoint timeout tracking
+- **Gatus Polling**: Advanced Gatus integration with API polling for comprehensive health checks
 - **Configurable Health Checks**: Customizable intervals, retry attempts, and timeouts
 
 ## How It Works
 
-1. **Service Monitoring**: Monitors configured services via ping or webhooks to check availability
+1. **Service Monitoring**: Monitors configured services via ping or Gatus API polling to check availability
 2. **DNS Management**: Automatically updates AdGuard Home DNS rewrites based on service health
 3. **Failover Logic**: When a service becomes unavailable, switches DNS to the next healthy service with highest priority
 4. **Automatic Recovery**: When a higher-priority service recovers, automatically switches back
@@ -90,7 +90,7 @@ Edit `config/appsettings.production.json` for basic ping monitoring:
 }
 ```
 
-> **For webhook monitoring with Gatus**: See `examples/webhook-integration-guide.md`
+> **For Gatus polling integration**: See `examples/webhook-integration-guide.md`
 
 ### 3. Deploy
 
@@ -112,7 +112,7 @@ docker-compose ps
 | Property | Description | Default |
 |----------|-------------|---------|
 | `Name` | Friendly name for the service | Required |
-| `MonitoringMode` | "Ping" or "Webhook" | Required |
+| `MonitoringMode` | "Ping" or "Gatus" | Required |
 | `IpAddress` | IP address to monitor and target | Required |
 | `Priority` | Lower number = higher priority | Required |
 | `TimeoutMs` | Ping timeout in milliseconds (ping mode) | 5000 |
@@ -190,13 +190,14 @@ docker run -d \\
 
 ## Advanced Monitoring
 
-### Webhook Integration with Gatus
+### Gatus API Integration
 
-For advanced monitoring beyond basic ping checks, AdGuard Home HA integrates with [Gatus](https://github.com/TwinProduction/gatus) via webhooks:
+For advanced monitoring beyond basic ping checks, AdGuard Home HA integrates with [Gatus](https://github.com/TwinProduction/gatus) via API polling:
 
-- **Per-endpoint timeout tracking** - Detects silent failures when monitoring machines crash  
-- **Redundant monitoring** - Multiple Gatus instances provide monitoring redundancy
+- **Active polling** - Continuously polls Gatus instances for endpoint health status
+- **Redundant monitoring** - Multiple Gatus instances provide monitoring redundancy  
 - **Complex health checks** - HTTP, TCP, DNS, and custom condition support
+- **Reliable detection** - No dependency on webhook delivery or state changes
 
 📖 **Full Setup Guide**: [`examples/webhook-integration-guide.md`](examples/webhook-integration-guide.md)
 

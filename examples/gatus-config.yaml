@@ -1,20 +1,10 @@
 # Gatus Configuration for AdGuard Home HA Integration
-# This configuration demonstrates best practices for webhook integration
-# with per-endpoint timeout tracking support
-
-# Global webhook configuration
-webhooks:
-  - name: "adguard-home-ha"
-    url: "http://adguard-home-ha:8080/webhook"
-    method: POST
-    headers:
-      Content-Type: application/json
-      Authorization: "Bearer your-secure-token-here"  # Replace with your actual token
-    failure-threshold: 3
-    success-threshold: 2
+# This configuration demonstrates endpoint monitoring that will be polled by AdGuard Home HA
+# AdGuard Home HA will poll the Gatus API directly, no webhooks needed
 
 # Endpoints to monitor
 # IMPORTANT: Endpoint names must match "GatusEndpointNames" in AdGuard Home HA config
+# AdGuard Home HA will poll these endpoints via Gatus API
 endpoints:
   # Primary web service monitoring
   - name: "primary-web-check"  # Matches GatusEndpointNames in service config
@@ -24,10 +14,7 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 2000"
-    alerts:
-      - type: webhook
-        webhooks: ["adguard-home-ha"]
-        description: "Primary web service health check"
+    # No alerts needed - AdGuard Home HA polls the status directly
 
   # Secondary web service for redundancy  
   - name: "secondary-web-check"
@@ -37,10 +24,7 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 2000"
-    alerts:
-      - type: webhook
-        webhooks: ["adguard-home-ha"]
-        description: "Secondary web service health check"
+    # No alerts needed - AdGuard Home HA polls the status directly
 
   # Backup service monitoring
   - name: "backup-web-check"
@@ -50,10 +34,7 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 2000"
-    alerts:
-      - type: webhook
-        webhooks: ["adguard-home-ha"]
-        description: "Backup web service health check"
+    # No alerts needed - AdGuard Home HA polls the status directly
 
   # API service with JSON response validation
   - name: "api-service-check"
@@ -64,10 +45,7 @@ endpoints:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 3000"
       - "[BODY].status == 'UP'"
-    alerts:
-      - type: webhook
-        webhooks: ["adguard-home-ha"]
-        description: "API service health check"
+    # No alerts needed - AdGuard Home HA polls the status directly
 
   # External website monitoring
   - name: "external-web-check"
@@ -78,10 +56,7 @@ endpoints:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 5000"
       - "len([BODY]) > 1000"
-    alerts:
-      - type: webhook
-        webhooks: ["adguard-home-ha"]
-        description: "External website health check"
+    # No alerts needed - AdGuard Home HA polls the status directly
 
 # Configuration Tips:
 # 1. Use descriptive endpoint names that identify the monitoring source

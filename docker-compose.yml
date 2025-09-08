@@ -13,9 +13,7 @@ services:
     networks:
       - default
     
-    # Port configuration (expose webhook port if webhooks are enabled)
-    ports:
-      - "${WEBHOOK_PORT:-8080}:8080"  # Webhook endpoint
+    # No ports needed - this is a background service
     
     # Environment variables (override configuration)
     environment:
@@ -32,12 +30,9 @@ services:
       - AdGuardHomeHA__Monitoring__RetryAttempts=${RETRY_ATTEMPTS:-3}
       - AdGuardHomeHA__Monitoring__RetryDelayMs=${RETRY_DELAY_MS:-1000}
       
-      # Webhook Configuration
-      - AdGuardHomeHA__Webhook__Enabled=${WEBHOOK_ENABLED:-false}
-      - AdGuardHomeHA__Webhook__Port=${WEBHOOK_PORT:-8080}
-      - AdGuardHomeHA__Webhook__Path=${WEBHOOK_PATH:-/webhook}
-      - AdGuardHomeHA__Webhook__AuthToken=${WEBHOOK_AUTH_TOKEN}
-      - AdGuardHomeHA__Webhook__HealthStatusTimeoutSeconds=${WEBHOOK_TIMEOUT_SECONDS:-300}
+      # Gatus Polling Configuration
+      - AdGuardHomeHA__GatusPolling__IntervalSeconds=${GATUS_POLLING_INTERVAL_SECONDS:-30}
+      - AdGuardHomeHA__GatusPolling__TimeoutSeconds=${GATUS_POLLING_TIMEOUT_SECONDS:-10}
     
     # Mount configuration file (optional)
     volumes:

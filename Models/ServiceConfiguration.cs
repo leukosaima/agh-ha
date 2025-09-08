@@ -9,5 +9,6 @@ public class ServiceConfiguration
     public int TimeoutMs { get; set; } = 5000;
     public string[] DnsRewrites { get; set; } = Array.Empty<string>();
     public string[] GatusEndpointNames { get; set; } = Array.Empty<string>();
+    public string[] GatusInstanceUrls { get; set; } = Array.Empty<string>(); // URLs of Gatus instances to poll
     public int RequiredGatusEndpoints { get; set; } = 1; // How many Gatus endpoints must report healthy
 }

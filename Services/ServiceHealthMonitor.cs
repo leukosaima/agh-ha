@@ -13,18 +13,18 @@ public class ServiceHealthMonitor : IServiceHealthMonitor
     private readonly ConcurrentDictionary<string, bool> _serviceStatus = new();
     private readonly ConcurrentDictionary<string, bool> _ipHealthCache = new();
     private readonly SemaphoreSlim _statusSemaphore = new(1, 1);
-    private readonly IWebhookHealthAggregator? _webhookAggregator;
+    private readonly IGatusPollingHealthMonitor? _gatusPollingMonitor;
 
     public event Action<string, bool>? ServiceStatusChanged;
 
     public ServiceHealthMonitor(
         IOptions<AppConfiguration> appConfig,
         ILogger<ServiceHealthMonitor> logger,
-        IWebhookHealthAggregator? webhookAggregator = null)
+        IGatusPollingHealthMonitor? gatusPollingMonitor = null)
     {
         _logger = logger;
         _config = appConfig.Value;
-        _webhookAggregator = webhookAggregator;
+        _gatusPollingMonitor = gatusPollingMonitor;
 
         // Initialize all services as unknown status
         foreach (var service in _config.Services)
@@ -32,10 +32,10 @@ public class ServiceHealthMonitor : IServiceHealthMonitor
             _serviceStatus[service.Name] = false;
         }
 
-        // Subscribe to webhook health changes if available
-        if (_webhookAggregator != null)
+        // Subscribe to Gatus polling health changes if available
+        if (_gatusPollingMonitor != null)
         {
-            _webhookAggregator.ServiceHealthChanged += OnServiceHealthChanged;
+            _gatusPollingMonitor.ServiceHealthChanged += OnServiceHealthChanged;
         }
     }
 
@@ -43,11 +43,11 @@ public class ServiceHealthMonitor : IServiceHealthMonitor
     {
         var allStatuses = new Dictionary<string, bool>();
 
-        // Get webhook-based service statuses
-        if (_webhookAggregator != null)
+        // Get Gatus-based service statuses
+        if (_gatusPollingMonitor != null)
         {
-            var webhookStatuses = await _webhookAggregator.GetServiceHealthStatusAsync();
-            foreach (var kvp in webhookStatuses)
+            var gatusStatuses = await _gatusPollingMonitor.GetServiceHealthStatusAsync();
+            foreach (var kvp in gatusStatuses)
             {
                 allStatuses[kvp.Key] = kvp.Value;
             }
@@ -211,10 +211,10 @@ public class ServiceHealthMonitor : IServiceHealthMonitor
             availableTargets.Add((service.Name, service.IpAddress, service.Priority));
         }
 
-        // Add webhook-based services that are healthy
-        foreach (var service in _config.Services.Where(s => s.MonitoringMode == HealthSource.Webhook))
+        // Add Gatus-based services that are healthy
+        foreach (var service in _config.Services.Where(s => s.MonitoringMode == HealthSource.Gatus))
         {
-            var isHealthy = _webhookAggregator?.GetServiceHealthAsync(service.Name).Result ?? false;
+            var isHealthy = _gatusPollingMonitor?.GetServiceHealthAsync(service.Name).Result ?? false;
             if (isHealthy)
             {
                 availableTargets.Add((service.Name, service.IpAddress, service.Priority));
@@ -266,10 +266,10 @@ public class ServiceHealthMonitor : IServiceHealthMonitor
             var previousStatus = _serviceStatus.GetValueOrDefault(serviceName, false);
             _serviceStatus[serviceName] = isHealthy;
 
-            _logger.LogInformation("Webhook service {ServiceName} health changed to {Status}",
+            _logger.LogInformation("Gatus service {ServiceName} health changed to {Status}",
                 serviceName, isHealthy ? "Healthy" : "Unhealthy");
 
-            // Always fire the service status changed event for webhook services
+            // Always fire the service status changed event for Gatus services
             ServiceStatusChanged?.Invoke(serviceName, isHealthy);
         }
         finally
@@ -280,9 +280,9 @@ public class ServiceHealthMonitor : IServiceHealthMonitor
 
     public void Dispose()
     {
-        if (_webhookAggregator != null)
+        if (_gatusPollingMonitor != null)
         {
-            _webhookAggregator.ServiceHealthChanged -= OnServiceHealthChanged;
+            _gatusPollingMonitor.ServiceHealthChanged -= OnServiceHealthChanged;
         }
         _statusSemaphore?.Dispose();
     }
