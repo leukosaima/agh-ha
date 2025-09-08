@@ -223,23 +223,30 @@ When a service becomes unhealthy:
     {
       "Name": "Critical Service",
       "GatusEndpointNames": [
-        "primary-machine-check",    // From primary Gatus
-        "secondary-machine-check",  // From secondary Gatus
-        "external-monitor-check"     // From external service
+        "primary-machine-check",
+        "secondary-machine-check",
+        "external-monitor-check"
       ],
-      "RequiredGatusEndpoints": 2,   // Need 2 out of 3
+      "RequiredGatusEndpoints": 2,
       "DnsRewrites": ["api.example.com"]
     }
   ]
 }
 ```
 
+**Endpoint Sources:**
+- `primary-machine-check` - From primary Gatus installation
+- `secondary-machine-check` - From secondary Gatus installation  
+- `external-monitor-check` - From external monitoring service
+- `RequiredGatusEndpoints: 2` - Need 2 out of 3 endpoints healthy
+
 ### Best Practices
 
 1. **Timeout Settings**: 
    ```json
-   "HealthStatusTimeoutSeconds": 180  // 3x Gatus check interval
+   "HealthStatusTimeoutSeconds": 180
    ```
+   Set to 3x your Gatus check interval for reliable stale detection.
 
 2. **Endpoint Naming**: Use descriptive names that identify the monitoring source:
    ```yaml
