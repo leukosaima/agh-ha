@@ -145,7 +145,6 @@ publish/
 
 # Publish Web Output
 *.[Pp]ublish.xml
-*.azurePubxml
 # Note: Comment the next line if you want to checkin your web deploy settings,
 # but database connection strings (with potential passwords) will be unencrypted
 *.pubxml
@@ -311,3 +310,4 @@ ASALocalRun/
 # Application specific
 .env
 config/appsettings.production.json
+/appsettings.test.json

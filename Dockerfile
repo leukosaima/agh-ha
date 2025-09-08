@@ -13,8 +13,8 @@ RUN dotnet publish "AdGuardHomeHA.csproj" \
     --no-restore \
     -o /app/publish
 
-# Runtime stage - .NET runtime image (needed for framework-dependent deployment)
-FROM mcr.microsoft.com/dotnet/runtime:9.0-alpine AS final
+# Runtime stage - ASP.NET Core runtime image (needed for web framework)
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS final
 
 # Install dependencies and create non-root user
 # iputils-ping installs a proper ping binary with setuid root
@@ -41,7 +41,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 ENV DOTNET_RUNNING_IN_CONTAINER=true
 ENV DOTNET_EnableDiagnostics=0
 
-# Expose no ports (this is an internal service)
+# Expose webhook port for Gatus webhooks
+EXPOSE 8080
 
 # Add capability for ping (ICMP) functionality
 # Note: This requires --cap-add=NET_RAW when running the container

@@ -4,20 +4,24 @@ A .NET 9 Docker container application that provides high availability for AdGuar
 
 ## Features
 
-- **Automatic Failover**: Monitors multiple machines via ping and switches DNS rewrites to healthy targets
-- **Priority-Based Selection**: Configure machine priorities for preferred failover order  
+### Core Capabilities
+- **Automatic Failover**: Monitors services and switches DNS rewrites to healthy targets
+- **Priority-Based Selection**: Configure service priorities for preferred failover order  
 - **REST API Integration**: Direct integration with AdGuard Home's REST API
-- **Configurable Monitoring**: Customizable check intervals, retry attempts, and timeouts
 - **Docker Support**: Containerized application for easy deployment
 - **Structured Logging**: Comprehensive logging for monitoring and troubleshooting
-- **Health Checks**: Built-in Docker health checks
+
+### Monitoring Modes
+- **Ping Monitoring**: Traditional ICMP ping-based health checking (simple setup)
+- **Webhook Monitoring**: Advanced Gatus integration with per-endpoint timeout tracking
+- **Configurable Health Checks**: Customizable intervals, retry attempts, and timeouts
 
 ## How It Works
 
-1. **Machine Monitoring**: Periodically pings configured machines to check availability
-2. **DNS Management**: Automatically updates AdGuard Home DNS rewrites based on machine health
-3. **Failover Logic**: When the current target becomes unavailable, switches to the next healthy machine with highest priority
-4. **Automatic Recovery**: When a higher-priority machine comes back online, switches back to it
+1. **Service Monitoring**: Monitors configured services via ping or webhooks to check availability
+2. **DNS Management**: Automatically updates AdGuard Home DNS rewrites based on service health
+3. **Failover Logic**: When a service becomes unavailable, switches DNS to the next healthy service with highest priority
+4. **Automatic Recovery**: When a higher-priority service recovers, automatically switches back
 
 ## Prerequisites
 
@@ -49,7 +53,7 @@ ADGUARD_USERNAME=admin
 ADGUARD_PASSWORD=your-secure-password
 ```
 
-Edit `config/appsettings.production.json`:
+Edit `config/appsettings.production.json` for basic ping monitoring:
 
 ```json
 {
@@ -59,27 +63,34 @@ Edit `config/appsettings.production.json`:
       "Username": "admin",
       "Password": "your-secure-password"
     },
-    "Machines": [
+    "Services": [
       {
         "Name": "Primary Server",
-        "IpAddress": "192.168.1.100", 
+        "MonitoringMode": "Ping",
+        "IpAddress": "192.168.1.100",
         "Priority": 1,
-        "TimeoutMs": 5000
+        "TimeoutMs": 5000,
+        "DnsRewrites": [
+          "www.yourdomain.com",
+          "api.yourdomain.com"
+        ]
       },
       {
-        "Name": "Secondary Server",
+        "Name": "Backup Server",
+        "MonitoringMode": "Ping",
         "IpAddress": "192.168.1.101",
         "Priority": 2,
-        "TimeoutMs": 5000
+        "DnsRewrites": [
+          "www.yourdomain.com",
+          "api.yourdomain.com"
+        ]
       }
-    ],
-    "DnsRewrites": [
-      "service.yourdomain.com",
-      "api.yourdomain.com"
     ]
   }
 }
 ```
+
+> **For webhook monitoring with Gatus**: See `examples/webhook-integration-guide.md`
 
 ### 3. Deploy
 
@@ -96,14 +107,16 @@ docker-compose ps
 
 ## Configuration Reference
 
-### Machine Configuration
+### Service Configuration
 
 | Property | Description | Default |
 |----------|-------------|---------|
-| `Name` | Friendly name for the machine | Required |
+| `Name` | Friendly name for the service | Required |
+| `MonitoringMode` | "Ping" or "Webhook" | Required |
 | `IpAddress` | IP address to monitor and target | Required |
 | `Priority` | Lower number = higher priority | Required |
-| `TimeoutMs` | Ping timeout in milliseconds | 5000 |
+| `TimeoutMs` | Ping timeout in milliseconds (ping mode) | 5000 |
+| `DnsRewrites` | Array of domains to manage | Required |
 
 ### Monitoring Configuration
 
@@ -174,6 +187,18 @@ docker run -d \\
   -e AdGuardHomeHA__AdGuardHome__Password=yourpassword \\
   adguard-home-ha
 ```
+
+## Advanced Monitoring
+
+### Webhook Integration with Gatus
+
+For advanced monitoring beyond basic ping checks, AdGuard Home HA integrates with [Gatus](https://github.com/TwinProduction/gatus) via webhooks:
+
+- **Per-endpoint timeout tracking** - Detects silent failures when monitoring machines crash  
+- **Redundant monitoring** - Multiple Gatus instances provide monitoring redundancy
+- **Complex health checks** - HTTP, TCP, DNS, and custom condition support
+
+📖 **Full Setup Guide**: [`examples/webhook-integration-guide.md`](examples/webhook-integration-guide.md)
 
 ## Health Monitoring
 

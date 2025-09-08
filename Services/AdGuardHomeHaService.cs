@@ -7,13 +7,13 @@ namespace AdGuardHomeHA.Services;
 
 public class AdGuardHomeHaService : BackgroundService
 {
-    private readonly IMachineHealthMonitor _healthMonitor;
+    private readonly IServiceHealthMonitor _healthMonitor;
     private readonly IDnsRewriteManager _dnsManager;
     private readonly ILogger<AdGuardHomeHaService> _logger;
     private readonly AppConfiguration _config;
 
     public AdGuardHomeHaService(
-        IMachineHealthMonitor healthMonitor,
+        IServiceHealthMonitor healthMonitor,
         IDnsRewriteManager dnsManager,
         IOptions<AppConfiguration> appConfig,
         ILogger<AdGuardHomeHaService> logger)
@@ -36,12 +36,13 @@ public class AdGuardHomeHaService : BackgroundService
             // Initialize DNS rewrite manager
             await _dnsManager.InitializeAsync();
 
-            // Subscribe to machine status changes
-            _healthMonitor.MachineStatusChanged += OnMachineStatusChanged;
+            // Subscribe to service status changes
+            _healthMonitor.ServiceStatusChanged += OnServiceStatusChanged;
 
             _logger.LogInformation("AdGuard Home HA service started successfully");
-            _logger.LogInformation("Monitoring {MachineCount} machines with {RewriteCount} DNS rewrites",
-                _config.Machines.Length, _config.DnsRewrites.Length);
+            var totalRewrites = _config.Services.Sum(s => s.DnsRewrites.Length);
+            _logger.LogInformation("Monitoring {ServiceCount} services with {RewriteCount} total DNS rewrites",
+                _config.Services.Length, totalRewrites);
         }
         catch (Exception ex)
         {
@@ -57,7 +58,7 @@ public class AdGuardHomeHaService : BackgroundService
         _logger.LogInformation("Stopping AdGuard Home High Availability service");
         
         // Unsubscribe from events
-        _healthMonitor.MachineStatusChanged -= OnMachineStatusChanged;
+        _healthMonitor.ServiceStatusChanged -= OnServiceStatusChanged;
 
         await base.StopAsync(cancellationToken);
         _logger.LogInformation("AdGuard Home HA service stopped");
@@ -112,22 +113,22 @@ public class AdGuardHomeHaService : BackgroundService
         {
             _logger.LogDebug("Performing health check cycle");
             
-            var machineStatuses = await _healthMonitor.CheckAllMachinesAsync();
+            var serviceStatuses = await _healthMonitor.CheckAllServicesAsync();
             
-            var healthyMachines = machineStatuses.Where(kvp => kvp.Value).ToArray();
-            var unhealthyMachines = machineStatuses.Where(kvp => !kvp.Value).ToArray();
+            var healthyServices = serviceStatuses.Where(kvp => kvp.Value).ToArray();
+            var unhealthyServices = serviceStatuses.Where(kvp => !kvp.Value).ToArray();
 
             _logger.LogDebug("Health check completed: {HealthyCount} healthy, {UnhealthyCount} unhealthy",
-                healthyMachines.Length, unhealthyMachines.Length);
+                healthyServices.Length, unhealthyServices.Length);
 
-            if (unhealthyMachines.Length > 0)
+            if (unhealthyServices.Length > 0)
             {
-                _logger.LogWarning("Unhealthy machines: {UnhealthyMachines}",
-                    string.Join(", ", unhealthyMachines.Select(kvp => kvp.Key)));
+                _logger.LogWarning("Unhealthy services: {UnhealthyServices}",
+                    string.Join(", ", unhealthyServices.Select(kvp => kvp.Key)));
             }
 
-            // Update DNS rewrites to point to the best available machine
-            await UpdateDnsToBestAvailableMachine();
+            // Update DNS rewrites for all services based on their current health
+            await UpdateAllServiceDnsRewrites();
         }
         catch (Exception ex)
         {
@@ -135,49 +136,97 @@ public class AdGuardHomeHaService : BackgroundService
         }
     }
 
-    private async void OnMachineStatusChanged(string machineName, bool isHealthy)
+    private async void OnServiceStatusChanged(string serviceName, bool isHealthy)
     {
         try
         {
-            _logger.LogInformation("Machine status change detected: {MachineName} is now {Status}",
-                machineName, isHealthy ? "healthy" : "unhealthy");
+            _logger.LogInformation("Service status change detected: {ServiceName} is now {Status}",
+                serviceName, isHealthy ? "healthy" : "unhealthy");
 
-            // When a machine status changes, immediately update DNS to the best available machine
-            await UpdateDnsToBestAvailableMachine();
+            // Find the service configuration
+            var service = _config.Services.FirstOrDefault(s => s.Name == serviceName);
+            if (service != null && service.DnsRewrites.Length > 0)
+            {
+                // Update DNS rewrites for this specific service
+                await UpdateDnsRewritesForService(service);
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error handling machine status change for {MachineName}", machineName);
+            _logger.LogError(ex, "Error handling service status change for {ServiceName}", serviceName);
         }
     }
 
-    private async Task UpdateDnsToBestAvailableMachine()
+    private async Task UpdateDnsRewritesForService(ServiceConfiguration service)
     {
         try
         {
-            var bestAvailableIp = _healthMonitor.GetBestAvailableMachine();
-            var currentTarget = await _dnsManager.GetCurrentTargetAsync();
-
-            if (bestAvailableIp == null)
+            var isServiceHealthy = await _healthMonitor.GetAllServiceHealthAsync();
+            var serviceHealth = isServiceHealthy.GetValueOrDefault(service.Name, false);
+            
+            string? targetIp = null;
+            if (serviceHealth)
             {
-                if (!string.IsNullOrEmpty(currentTarget))
+                targetIp = service.IpAddress;
+                _logger.LogInformation("Service {ServiceName} is healthy, updating its DNS rewrites to {IpAddress}",
+                    service.Name, targetIp);
+            }
+            else
+            {
+                // Find the best alternative service that can handle these DNS rewrites
+                var alternativeService = await FindBestAlternativeService(service);
+                if (alternativeService != null)
                 {
-                    _logger.LogCritical("No healthy machines available, but DNS rewrites are still pointing to {CurrentTarget}. " +
-                                       "Consider manual intervention.", currentTarget);
+                    targetIp = alternativeService.IpAddress;
+                    _logger.LogInformation("Service {ServiceName} is unhealthy, failing over DNS rewrites to {AlternativeService} at {IpAddress}",
+                        service.Name, alternativeService.Name, targetIp);
                 }
                 else
                 {
-                    _logger.LogCritical("No healthy machines available and no current DNS target set");
+                    _logger.LogWarning("Service {ServiceName} is unhealthy and no healthy alternative found. DNS rewrites will remain unchanged.",
+                        service.Name);
+                    return;
                 }
-                return;
             }
 
-            // Update DNS rewrites to point to the best available machine
-            await _dnsManager.UpdateRewritesAsync(bestAvailableIp);
+            // Update each DNS rewrite for this service
+            foreach (var domain in service.DnsRewrites)
+            {
+                await _dnsManager.UpdateSingleRewriteAsync(domain, targetIp);
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating DNS to best available machine");
+            _logger.LogError(ex, "Error updating DNS rewrites for service {ServiceName}", service.Name);
+        }
+    }
+
+    private async Task<ServiceConfiguration?> FindBestAlternativeService(ServiceConfiguration failedService)
+    {
+        var healthyServices = await _healthMonitor.GetAllServiceHealthAsync();
+        
+        return _config.Services
+            .Where(s => s.Name != failedService.Name && healthyServices.GetValueOrDefault(s.Name, false))
+            .OrderBy(s => s.Priority)
+            .FirstOrDefault();
+    }
+
+    private async Task UpdateAllServiceDnsRewrites()
+    {
+        try
+        {
+            _logger.LogDebug("Updating DNS rewrites for all services");
+            
+            // Update DNS rewrites for each service that has them
+            var updateTasks = _config.Services
+                .Where(s => s.DnsRewrites.Length > 0)
+                .Select(service => UpdateDnsRewritesForService(service));
+                
+            await Task.WhenAll(updateTasks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating DNS rewrites for all services");
         }
     }
 
@@ -195,34 +244,56 @@ public class AdGuardHomeHaService : BackgroundService
         if (string.IsNullOrWhiteSpace(_config.AdGuardHome.Password))
             errors.Add("AdGuardHome:Password is required");
 
-        // Validate machines configuration
-        if (_config.Machines == null || _config.Machines.Length == 0)
-            errors.Add("At least one machine must be configured");
+        // Validate services configuration
+        if (_config.Services == null || _config.Services.Length == 0)
+            errors.Add("At least one service must be configured");
         else
         {
-            for (int i = 0; i < _config.Machines.Length; i++)
+            for (int i = 0; i < _config.Services.Length; i++)
             {
-                var machine = _config.Machines[i];
-                if (string.IsNullOrWhiteSpace(machine.Name))
-                    errors.Add($"Machine[{i}]:Name is required");
+                var service = _config.Services[i];
+                if (string.IsNullOrWhiteSpace(service.Name))
+                    errors.Add($"Services[{i}]:Name is required");
                 
-                if (string.IsNullOrWhiteSpace(machine.IpAddress))
-                    errors.Add($"Machine[{i}]:IpAddress is required");
+                if (string.IsNullOrWhiteSpace(service.IpAddress))
+                    errors.Add($"Services[{i}]:IpAddress is required");
                 
-                if (machine.TimeoutMs <= 0)
-                    errors.Add($"Machine[{i}]:TimeoutMs must be greater than 0");
+                if (service.TimeoutMs <= 0)
+                    errors.Add($"Services[{i}]:TimeoutMs must be greater than 0");
+                    
+                // Validate webhook-specific settings
+                if (service.MonitoringMode == HealthSource.Webhook)
+                {
+                    if (service.GatusEndpointNames == null || service.GatusEndpointNames.Length == 0)
+                        errors.Add($"Services[{i}]:GatusEndpointNames is required for webhook monitoring");
+                        
+                    if (service.RequiredGatusEndpoints <= 0)
+                        errors.Add($"Services[{i}]:RequiredGatusEndpoints must be greater than 0");
+                        
+                    if (service.RequiredGatusEndpoints > service.GatusEndpointNames?.Length)
+                        errors.Add($"Services[{i}]:RequiredGatusEndpoints cannot be greater than the number of GatusEndpointNames");
+                }
             }
         }
 
-        // Validate DNS rewrites
-        if (_config.DnsRewrites == null || _config.DnsRewrites.Length == 0)
-            errors.Add("At least one DNS rewrite domain must be configured");
-        else
+        // Validate that at least one service has DNS rewrites configured
+        var servicesWithRewrites = _config.Services?.Where(s => s.DnsRewrites?.Length > 0).ToArray() ?? Array.Empty<ServiceConfiguration>();
+        if (servicesWithRewrites.Length == 0)
         {
-            for (int i = 0; i < _config.DnsRewrites.Length; i++)
+            errors.Add("At least one service must have DNS rewrites configured");
+        }
+        
+        // Validate individual service DNS rewrites
+        for (int i = 0; i < (_config.Services?.Length ?? 0); i++)
+        {
+            var service = _config.Services![i];
+            if (service.DnsRewrites != null)
             {
-                if (string.IsNullOrWhiteSpace(_config.DnsRewrites[i]))
-                    errors.Add($"DnsRewrites[{i}] cannot be empty");
+                for (int j = 0; j < service.DnsRewrites.Length; j++)
+                {
+                    if (string.IsNullOrWhiteSpace(service.DnsRewrites[j]))
+                        errors.Add($"Services[{i}]:DnsRewrites[{j}] cannot be empty");
+                }
             }
         }
 

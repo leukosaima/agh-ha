@@ -13,6 +13,10 @@ services:
     networks:
       - default
     
+    # Port configuration (expose webhook port if webhooks are enabled)
+    ports:
+      - "${WEBHOOK_PORT:-8080}:8080"  # Webhook endpoint
+    
     # Environment variables (override configuration)
     environment:
       - DOTNET_ENVIRONMENT=Production
@@ -27,6 +31,13 @@ services:
       - AdGuardHomeHA__Monitoring__CheckIntervalSeconds=${CHECK_INTERVAL_SECONDS:-30}
       - AdGuardHomeHA__Monitoring__RetryAttempts=${RETRY_ATTEMPTS:-3}
       - AdGuardHomeHA__Monitoring__RetryDelayMs=${RETRY_DELAY_MS:-1000}
+      
+      # Webhook Configuration
+      - AdGuardHomeHA__Webhook__Enabled=${WEBHOOK_ENABLED:-false}
+      - AdGuardHomeHA__Webhook__Port=${WEBHOOK_PORT:-8080}
+      - AdGuardHomeHA__Webhook__Path=${WEBHOOK_PATH:-/webhook}
+      - AdGuardHomeHA__Webhook__AuthToken=${WEBHOOK_AUTH_TOKEN}
+      - AdGuardHomeHA__Webhook__HealthStatusTimeoutSeconds=${WEBHOOK_TIMEOUT_SECONDS:-300}
     
     # Mount configuration file (optional)
     volumes:

@@ -13,29 +13,51 @@
       "Username": "admin",
       "Password": ""
     },
-    "Machines": [
+    "Services": [
       {
-        "Name": "Primary Server",
+        "Name": "Web Frontend",
+        "MonitoringMode": "Ping",
         "IpAddress": "192.168.1.100",
         "Priority": 1,
-        "TimeoutMs": 5000
+        "TimeoutMs": 5000,
+        "DnsRewrites": [
+          "www.yourdomain.com",
+          "yourdomain.com"
+        ]
       },
       {
-        "Name": "Secondary Server", 
+        "Name": "API Backend",
+        "MonitoringMode": "Ping",
         "IpAddress": "192.168.1.101",
         "Priority": 2,
-        "TimeoutMs": 5000
+        "TimeoutMs": 5000,
+        "DnsRewrites": [
+          "api.yourdomain.com"
+        ]
+      },
+      {
+        "Name": "Database Service",
+        "MonitoringMode": "Webhook",
+        "IpAddress": "192.168.1.102",
+        "Priority": 3,
+        "DnsRewrites": [
+          "db.yourdomain.com"
+        ],
+        "GatusEndpointNames": ["gatus-db-1", "gatus-db-2"],
+        "RequiredGatusEndpoints": 1
       }
-    ],
-    "DnsRewrites": [
-      "service.yourdomain.com",
-      "api.yourdomain.com",
-      "app.yourdomain.com"
     ],
     "Monitoring": {
       "CheckIntervalSeconds": 30,
       "RetryAttempts": 3,
       "RetryDelayMs": 1000
+    },
+    "Webhook": {
+      "Enabled": true,
+      "Port": 8080,
+      "Path": "/webhook",
+      "HealthStatusTimeoutSeconds": 300,
+      "AuthToken": "your-webhook-auth-token-here"
     }
   }
 }

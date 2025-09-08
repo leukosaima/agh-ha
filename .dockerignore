@@ -1,15 +1,35 @@
+# .NET build artifacts
 **/bin/
 **/obj/
+
+# IDE and editor files
 **/.vs/
 **/.vscode/
-**/node_modules/
-**/npm-debug.log
-**/.env
+**/.idea/
 **/*.user
 **/*.suo
+**/*.DotSettings*
+
+# Node.js (if any)
+**/node_modules/
+**/npm-debug.log
+
+# Environment and secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Version control
 **/.git/
 **/.gitignore
+**/.gitattributes
+
+# Docker files
 **/Dockerfile*
 **/docker-compose*
-**/README.md
 **/.dockerignore
+
+# Documentation and examples (not needed in runtime)
+**/*.md
+**/examples/
+**/.github/
