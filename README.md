@@ -118,13 +118,24 @@ docker-compose ps
 | `TimeoutMs` | Ping timeout in milliseconds (ping mode) | 5000 |
 | `DnsRewrites` | Array of domains to manage | Required |
 
-### Monitoring Configuration
+### Monitoring Configuration (Ping Services Only)
 
 | Property | Description | Default |
 |----------|-------------|---------|
-| `CheckIntervalSeconds` | Seconds between health checks | 30 |
+| `CheckIntervalSeconds` | Seconds between ping health checks | 30 |
 | `RetryAttempts` | Number of ping retries per check | 3 |
 | `RetryDelayMs` | Delay between retry attempts | 1000 |
+
+**Note**: This configuration is only used for services with `MonitoringMode: "Ping"`. Gatus services use their own `GatusPolling` configuration.
+
+### Gatus Polling Configuration (Gatus Services Only)
+
+| Property | Description | Default |
+|----------|-------------|---------|
+| `IntervalSeconds` | Seconds between Gatus API polls | 30 |
+| `TimeoutSeconds` | HTTP timeout for Gatus API calls | 10 |
+
+**Note**: This configuration is only used for services with `MonitoringMode: "Gatus"`.
 
 ### AdGuard Home Configuration
 

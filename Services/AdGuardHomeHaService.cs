@@ -66,45 +66,70 @@ public class AdGuardHomeHaService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Starting monitoring loop with {Interval}s interval", 
-            _config.Monitoring.CheckIntervalSeconds);
-
-        // Perform initial health check
-        await PerformHealthCheckCycle();
-
-        while (!stoppingToken.IsCancellationRequested)
+        var pingServices = _config.Services.Where(s => s.MonitoringMode == HealthSource.Ping).ToArray();
+        
+        if (pingServices.Length > 0)
         {
+            _logger.LogInformation("Starting ping monitoring loop with {Interval}s interval for {ServiceCount} ping-based services", 
+                _config.Monitoring.CheckIntervalSeconds, pingServices.Length);
+
+            // Perform initial health check
+            await PerformHealthCheckCycle();
+
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(_config.Monitoring.CheckIntervalSeconds), stoppingToken);
+                    
+                    if (!stoppingToken.IsCancellationRequested)
+                    {
+                        await PerformHealthCheckCycle();
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected when cancellation is requested
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error in ping monitoring loop");
+                    
+                    // Wait a shorter interval before retrying on error
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            _logger.LogInformation("Ping monitoring loop ended");
+        }
+        else
+        {
+            var gatusServices = _config.Services.Where(s => s.MonitoringMode == HealthSource.Gatus).ToArray();
+            _logger.LogInformation("No ping-based services configured. Running in Gatus-only mode with {ServiceCount} Gatus services. DNS updates will be triggered by Gatus polling events.", gatusServices.Length);
+            
+            // Perform initial DNS setup for Gatus services
+            await UpdateAllServiceDnsRewrites();
+            
+            // Just wait for cancellation - Gatus polling handles everything via events
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(_config.Monitoring.CheckIntervalSeconds), stoppingToken);
-                
-                if (!stoppingToken.IsCancellationRequested)
-                {
-                    await PerformHealthCheckCycle();
-                }
+                await Task.Delay(Timeout.Infinite, stoppingToken);
             }
             catch (OperationCanceledException)
             {
                 // Expected when cancellation is requested
-                break;
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in monitoring loop");
-                
-                // Wait a shorter interval before retrying on error
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-            }
+            
+            _logger.LogInformation("Gatus-only monitoring ended");
         }
-
-        _logger.LogInformation("Monitoring loop ended");
     }
 
     private async Task PerformHealthCheckCycle()
@@ -300,15 +325,19 @@ public class AdGuardHomeHaService : BackgroundService
             }
         }
 
-        // Validate monitoring configuration
-        if (_config.Monitoring.CheckIntervalSeconds <= 0)
-            errors.Add("Monitoring:CheckIntervalSeconds must be greater than 0");
-        
-        if (_config.Monitoring.RetryAttempts <= 0)
-            errors.Add("Monitoring:RetryAttempts must be greater than 0");
-        
-        if (_config.Monitoring.RetryDelayMs < 0)
-            errors.Add("Monitoring:RetryDelayMs cannot be negative");
+        // Validate monitoring configuration (only required for ping services)
+        var hasPingServices = _config.Services?.Any(s => s.MonitoringMode == HealthSource.Ping) ?? false;
+        if (hasPingServices)
+        {
+            if (_config.Monitoring.CheckIntervalSeconds <= 0)
+                errors.Add("Monitoring:CheckIntervalSeconds must be greater than 0 (required for ping services)");
+            
+            if (_config.Monitoring.RetryAttempts <= 0)
+                errors.Add("Monitoring:RetryAttempts must be greater than 0 (required for ping services)");
+            
+            if (_config.Monitoring.RetryDelayMs < 0)
+                errors.Add("Monitoring:RetryDelayMs cannot be negative (required for ping services)");
+        }
 
         if (errors.Count > 0)
         {

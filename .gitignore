@@ -310,4 +310,3 @@ ASALocalRun/
 # Application specific
 .env
 config/appsettings.production.json
-/appsettings.test.json

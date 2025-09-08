@@ -132,17 +132,28 @@ Each service manages its own DNS rewrites independently. When a service becomes 
 ### Monitoring Behavior
 
 **Ping-Based Services:**
-- Health checks run on configurable intervals (default 30 seconds)
+- Main service runs a monitoring loop with configurable intervals (default 30 seconds)
 - IP deduplication: Services sharing IPs are pinged once per cycle  
 - Uses Linux ping command with timeouts (requires --cap-add=NET_RAW for containers)
 - Failed health checks trigger immediate DNS updates for affected services
 
 **Gatus Polling Services:**
-- Regular polling of Gatus API endpoints (default 30s interval)
+- Independent polling of Gatus API endpoints (default 30s interval)
 - Per-endpoint health tracking across multiple Gatus instances
 - Configurable polling intervals and HTTP timeouts
 - Service health aggregated based on RequiredGatusEndpoints threshold
-- DNS updates triggered immediately on service health state changes
+- DNS updates triggered immediately via ServiceHealthChanged events
+- **No main monitoring loop needed** - runs purely on events
+
+**Mixed Mode:**
+- Ping services use the main monitoring loop
+- Gatus services run independently via events
+- Both can coexist and failover to each other based on priority
+
+**Gatus-Only Mode:**
+- No main monitoring loop runs
+- All monitoring handled by Gatus polling events
+- More efficient for pure Gatus deployments
 
 ## Development Notes
 
