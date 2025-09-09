@@ -153,9 +153,6 @@ public class GatusPollingHealthMonitor : IGatusPollingHealthMonitor
                     {
                         endpointResults[endpointName] = endpointStatus.Value;
                         _serviceStatuses[service.Name].EndpointLastSeen[endpointName] = now;
-                        
-                        _logger.LogDebug("Polled Gatus endpoint {EndpointName} from {GatusUrl}: {Status}",
-                            endpointName, gatusUrl, endpointStatus.Value);
                     }
                     else
                     {
@@ -191,26 +188,34 @@ public class GatusPollingHealthMonitor : IGatusPollingHealthMonitor
     {
         try
         {
-            // Gatus API endpoint: GET /api/v1/endpoints/{key}/statuses
-            // We'll use the simpler approach of getting the endpoint summary
-            var apiUrl = $"{gatusUrl.TrimEnd('/')}/api/v1/endpoints/statuses";
+            // Use individual endpoint query for better efficiency: GET /api/v1/endpoints/{key}/statuses
+            // This reduces network traffic compared to fetching all endpoints
+            var apiUrl = $"{gatusUrl.TrimEnd('/')}/api/v1/endpoints/{endpointName}/statuses";
             
             var response = await _httpClient.GetAsync(apiUrl);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Gatus API returned {StatusCode} for {GatusUrl}", response.StatusCode, apiUrl);
+                _logger.LogWarning("Gatus API returned {StatusCode} for endpoint {EndpointName} at {GatusUrl}", 
+                    response.StatusCode, endpointName, apiUrl);
                 return null;
             }
             
             var jsonContent = await response.Content.ReadAsStringAsync();
-            var endpointStatuses = JsonSerializer.Deserialize<Dictionary<string, GatusEndpointStatus>>(jsonContent, new JsonSerializerOptions
+            var endpointStatus = JsonSerializer.Deserialize<GatusEndpointStatus>(jsonContent, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
             
-            if (endpointStatuses?.TryGetValue(endpointName, out var endpointStatus) == true)
+            if (endpointStatus != null)
             {
-                return endpointStatus.Status == "UP";
+                // Only check the most recent result (first in array) for efficiency
+                var latestResult = endpointStatus.Results?.FirstOrDefault();
+                var isHealthy = latestResult?.Success == true;
+                
+                _logger.LogDebug("Polled Gatus endpoint {EndpointName} from {GatusUrl}: {Status} (timestamp: {Timestamp})",
+                    endpointName, gatusUrl, isHealthy, latestResult?.Timestamp);
+                    
+                return isHealthy;
             }
             
             _logger.LogDebug("Endpoint {EndpointName} not found in Gatus instance {GatusUrl}", endpointName, gatusUrl);
@@ -238,7 +243,23 @@ public class GatusPollingHealthMonitor : IGatusPollingHealthMonitor
 // DTO for Gatus API response
 public class GatusEndpointStatus
 {
-    public string Status { get; set; } = "";
-    public DateTime LastCheck { get; set; }
-    public int ResponseTime { get; set; }
+    public string Name { get; set; } = "";
+    public string Group { get; set; } = "";
+    public string Key { get; set; } = "";
+    public List<GatusResult>? Results { get; set; }
+}
+
+public class GatusResult
+{
+    public string Hostname { get; set; } = "";
+    public long Duration { get; set; }
+    public bool Success { get; set; }
+    public DateTime Timestamp { get; set; }
+    public List<GatusConditionResult>? ConditionResults { get; set; }
+}
+
+public class GatusConditionResult
+{
+    public string Condition { get; set; } = "";
+    public bool Success { get; set; }
 }
