@@ -104,64 +104,55 @@ endpoints:
       - "[RESPONSE_TIME] < 2000"
 ```
 
-## Per-Endpoint Timeout Tracking
+## Per-Instance Polling
 
-**Key Feature**: Individual endpoints are tracked independently. If a Gatus machine crashes, only its endpoints become stale while others continue working.
+**Key Feature**: AdGuard Home HA polls multiple Gatus instances independently. If a Gatus machine goes down, only endpoints from that instance are affected.
 
 ### How It Works
 
-1. **Individual Timestamps**: Each endpoint gets its own `LastSeen` timestamp
-2. **Background Monitoring**: Timer checks every 60 seconds for stale endpoints  
-3. **Graceful Degradation**: Services stay healthy if enough endpoints are active
-4. **Automatic Recovery**: When endpoints come back, they resume normal operation
+1. **Independent Polling**: Each Gatus instance URL is polled separately
+2. **Timeout Handling**: HTTP timeouts (10s default) mark endpoints as unreachable
+3. **Graceful Degradation**: Services stay healthy if enough endpoints are reachable
+4. **Automatic Recovery**: When Gatus instances come back online, endpoints resume normal status
 
-### Example Scenario: Primary Machine Crashes
+### Example Scenario: Primary Gatus Machine Crashes
 
 | Time | Event | Endpoint Status | Service Health | Action |
 |------|-------|-----------------|----------------|--------|
-| 10:00 | Normal | `primary-web-check: healthy`<br>`secondary-web-check: healthy` | **Healthy** | Normal operation |
-| 10:01 | **Primary crashes** | No change yet | **Healthy** | Secondary keeps sending webhooks |
-| 10:04 | Stale detection | `primary-web-check: STALE`<br>`secondary-web-check: healthy` | **Healthy** (1/2 healthy, need 1) | Stale endpoint marked unhealthy |
-| 10:15 | Primary recovers | `primary-web-check: healthy`<br>`secondary-web-check: healthy` | **Healthy** | Full redundancy restored |
+| 10:00 | Normal | `primary-web-check: healthy` (gatus-1)<br>`secondary-web-check: healthy` (gatus-2) | **Healthy** | Normal operation |
+| 10:01 | **Gatus-1 crashes** | Polling gatus-1 times out | **Healthy** | Gatus-2 still responding |
+| 10:01 | Next poll cycle | `primary-web-check: UNREACHABLE`<br>`secondary-web-check: healthy` | **Healthy** (1/2 healthy, need 1) | DNS stays active |
+| 10:15 | Gatus-1 recovers | Both instances responding | **Healthy** | Full redundancy restored |
 
-### Benefits Over Old System
+### Benefits of Polling Approach
 
-**❌ Old System (Service-Level Timeout)**:
-- Primary machine crashes → Secondary keeps updating `LastUpdated`
-- System never detects primary failure → DNS stays broken
+**✅ Active Monitoring**:
+- Predictable polling intervals (30s default)
+- No dependency on webhook delivery reliability
+- Works regardless of Gatus alert configuration
 
-**✅ New System (Per-Endpoint Timeout)**:
-- Primary machine crashes → Only `primary-web-check` goes stale
-- `secondary-web-check` keeps service healthy → DNS stays working
-- When primary returns → Automatic recovery
+**✅ Instance Redundancy**:
+- Multiple Gatus instances provide monitoring redundancy
+- Timeout on one instance doesn't affect others
+- Immediate recovery when instances come back online
 
-## Testing Webhooks
+## Testing Gatus Integration
 
 ### Manual Testing
 
 ```bash
-# Test healthy webhook
-curl -X POST http://localhost:8080/webhook \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer your-secure-token-here" \
-  -d '{
-    "endpointName": "primary-web-check",
-    "success": true,
-    "timestamp": "2025-01-08T12:00:00Z"
-  }'
+# Test Gatus API directly
+curl -s "http://gatus-instance:8080/api/v1/endpoints/statuses" | jq
 
-# Test unhealthy webhook
-curl -X POST http://localhost:8080/webhook \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer your-secure-token-here" \
-  -d '{
-    "endpointName": "primary-web-check",
-    "success": false,
-    "timestamp": "2025-01-08T12:00:00Z"
-  }'
+# Check specific endpoint status
+curl -s "http://gatus-instance:8080/api/v1/endpoints/statuses" | jq '."production_web-check"'
 
-# Test health endpoint
-curl http://localhost:8080/webhook/health
+# Monitor AdGuard Home HA logs for polling
+docker-compose logs -f adguard-home-ha | grep "Gatus"
+
+# Check current DNS rewrites
+curl -s "http://adguard-home:3000/control/rewrite/list" \\
+  -H "Authorization: Basic $(echo -n 'admin:password' | base64)"
 ```
 
 ## Health Aggregation & Failover
@@ -184,7 +175,7 @@ In this example, 2 out of 3 endpoints must be healthy for the service to be cons
 - ✅ **2 healthy**: Service = healthy (meets threshold)
 - ❌ **1 healthy**: Service = unhealthy (below threshold)
 - ❌ **0 healthy**: Service = unhealthy
-- ⏰ **Stale endpoints**: Marked unhealthy after timeout (default 3 minutes)
+- ⏰ **Unreachable Gatus**: Endpoints from unreachable Gatus instances are excluded
 
 ### DNS Failover Logic
 

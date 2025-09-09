@@ -90,7 +90,7 @@ Edit `config/appsettings.production.json` for basic ping monitoring:
 }
 ```
 
-> **For Gatus polling integration**: See `examples/webhook-integration-guide.md`
+> **For Gatus polling integration**: See `examples/gatus-integration-guide.md`
 
 ### 3. Deploy
 
@@ -213,7 +213,7 @@ For advanced monitoring beyond basic ping checks, AdGuard Home HA integrates wit
 - **Complex health checks** - HTTP, TCP, DNS, and custom condition support
 - **Reliable detection** - No dependency on webhook delivery or state changes
 
-📖 **Full Setup Guide**: [`examples/webhook-integration-guide.md`](examples/webhook-integration-guide.md)
+📖 **Full Setup Guide**: [`examples/gatus-integration-guide.md`](examples/gatus-integration-guide.md)
 
 ## Health Monitoring
 

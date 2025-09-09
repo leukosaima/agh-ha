@@ -52,7 +52,7 @@ cp config/appsettings.production.json.example config/appsettings.production.json
 
 # Edit configuration files (required before first run)
 # Edit .env for basic AdGuard Home connection
-# Edit config/appsettings.production.json for services and webhook configuration
+# Edit config/appsettings.production.json for services and Gatus polling configuration
 ```
 
 ### Configuration Testing
@@ -89,11 +89,11 @@ All configuration is split across individual model files with hierarchical setti
 
 ### Failover Logic
 The application implements service-based failover with per-service DNS management:
-1. Each service monitors its own health (ping or webhook)
+1. Each service monitors its own health (ping or Gatus polling)
 2. Each service manages its own DNS rewrites independently
 3. On service failure, its DNS rewrites failover to the next highest priority healthy service
 4. IP deduplication ensures efficient ping monitoring for services sharing IP addresses
-5. Webhook services aggregate health from multiple Gatus endpoints based on configured thresholds
+5. Gatus polling services aggregate health from multiple Gatus endpoints based on configured thresholds
 
 ### Authentication Flow
 AdGuardHomeClient handles session-based authentication:
@@ -206,17 +206,17 @@ Configuration can be overridden via environment variables using ASP.NET Core's h
 ### Documentation Structure
 - **README.md**: Getting started guide focused on ping monitoring with clear progression to Gatus polling
 - **WARP.md**: This file - comprehensive development and architecture reference
-- **examples/webhook-integration-guide.md**: Complete Gatus integration guide with polling configuration
+- **examples/gatus-integration-guide.md**: Complete Gatus integration guide with polling configuration
 - **examples/gatus-config.yaml**: Comprehensive Gatus configuration with best practices
 
 ### Key Documentation Principles
-- **Layered Approach**: Basic (README) → Advanced (webhook guide)
+- **Layered Approach**: Basic (README) → Advanced (Gatus polling guide)
 - **No Content Duplication**: Each file serves a distinct purpose
 - **Clear Cross-References**: Files reference each other appropriately
 - **Up-to-Date Examples**: All examples use current "endpoint" terminology (not "instances")
 
 ### Testing Integration
-For comprehensive Gatus integration scenarios, see `examples/webhook-integration-guide.md` which includes:
+For comprehensive Gatus integration scenarios, see `examples/gatus-integration-guide.md` which includes:
 - Configuration examples for Gatus polling
 - Multi-instance Gatus deployment patterns
 - Troubleshooting polling connectivity issues
