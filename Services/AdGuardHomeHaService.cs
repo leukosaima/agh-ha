@@ -186,38 +186,10 @@ public class AdGuardHomeHaService : BackgroundService
     {
         try
         {
-            var isServiceHealthy = await _healthMonitor.GetAllServiceHealthAsync();
-            var serviceHealth = isServiceHealthy.GetValueOrDefault(service.Name, false);
-            
-            string? targetIp = null;
-            if (serviceHealth)
-            {
-                targetIp = service.IpAddress;
-                _logger.LogInformation("Service {ServiceName} is healthy, updating its DNS rewrites to {IpAddress}",
-                    service.Name, targetIp);
-            }
-            else
-            {
-                // Find the best alternative service that can handle these DNS rewrites
-                var alternativeService = await FindBestAlternativeService(service);
-                if (alternativeService != null)
-                {
-                    targetIp = alternativeService.IpAddress;
-                    _logger.LogInformation("Service {ServiceName} is unhealthy, failing over DNS rewrites to {AlternativeService} at {IpAddress}",
-                        service.Name, alternativeService.Name, targetIp);
-                }
-                else
-                {
-                    _logger.LogWarning("Service {ServiceName} is unhealthy and no healthy alternative found. DNS rewrites will remain unchanged.",
-                        service.Name);
-                    return;
-                }
-            }
-
-            // Update each DNS rewrite for this service
+            // Update DNS rewrites for each domain managed by this service
             foreach (var domain in service.DnsRewrites)
             {
-                await _dnsManager.UpdateSingleRewriteAsync(domain, targetIp);
+                await UpdateDnsRewriteForDomain(domain);
             }
         }
         catch (Exception ex)
@@ -226,14 +198,39 @@ public class AdGuardHomeHaService : BackgroundService
         }
     }
 
-    private async Task<ServiceConfiguration?> FindBestAlternativeService(ServiceConfiguration failedService)
+    private async Task UpdateDnsRewriteForDomain(string domain)
     {
-        var healthyServices = await _healthMonitor.GetAllServiceHealthAsync();
-        
-        return _config.Services
-            .Where(s => s.Name != failedService.Name && healthyServices.GetValueOrDefault(s.Name, false))
-            .OrderBy(s => s.Priority)
-            .FirstOrDefault();
+        try
+        {
+            // Find all services that manage this domain and their health status
+            var allServiceHealth = await _healthMonitor.GetAllServiceHealthAsync();
+            var servicesForDomain = _config.Services
+                .Where(s => s.DnsRewrites.Contains(domain))
+                .ToArray();
+
+            // Find the highest priority healthy service for this domain
+            var targetService = servicesForDomain
+                .Where(s => allServiceHealth.GetValueOrDefault(s.Name, false))
+                .OrderBy(s => s.Priority)
+                .FirstOrDefault();
+
+            if (targetService != null)
+            {
+                _logger.LogInformation("Updating DNS rewrite for {Domain} to {IpAddress} (service: {ServiceName}, priority: {Priority})",
+                    domain, targetService.IpAddress, targetService.Name, targetService.Priority);
+                await _dnsManager.UpdateSingleRewriteAsync(domain, targetService.IpAddress);
+            }
+            else
+            {
+                var servicesForDomainNames = string.Join(", ", servicesForDomain.Select(s => s.Name));
+                _logger.LogWarning("No healthy services available for domain {Domain}. Services managing this domain: [{Services}]. DNS rewrite will remain unchanged.",
+                    domain, servicesForDomainNames);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating DNS rewrite for domain {Domain}", domain);
+        }
     }
 
     private async Task UpdateAllServiceDnsRewrites()
@@ -242,11 +239,15 @@ public class AdGuardHomeHaService : BackgroundService
         {
             _logger.LogDebug("Updating DNS rewrites for all services");
             
-            // Update DNS rewrites for each service that has them
-            var updateTasks = _config.Services
+            // Get all unique domains to avoid duplicate updates
+            var allDomains = _config.Services
                 .Where(s => s.DnsRewrites.Length > 0)
-                .Select(service => UpdateDnsRewritesForService(service));
-                
+                .SelectMany(s => s.DnsRewrites)
+                .Distinct()
+                .ToArray();
+            
+            // Update each unique domain based on the highest priority healthy service
+            var updateTasks = allDomains.Select(domain => UpdateDnsRewriteForDomain(domain));
             await Task.WhenAll(updateTasks);
         }
         catch (Exception ex)
