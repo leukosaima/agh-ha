@@ -193,8 +193,10 @@ Program.cs configures services for background operation:
 **Health Aggregation Logic:**
 - Health status aggregation uses `RequiredGatusEndpoints` threshold per service
 - Service health events fired when overall service health state changes
-- Gatus endpoint names must exactly match `ServiceConfiguration.GatusEndpointNames`
+- `GatusEndpointNames` must use full Gatus keys: `"<GROUP_NAME>_<ENDPOINT_NAME>"`
+- Special characters in group/endpoint names are replaced with `-` by Gatus
 - Multiple `GatusInstanceUrls` provide redundancy for endpoint monitoring
+- Example: Gatus endpoint `name: "web"` + `group: "prod"` = key `"prod_web"`
 
 ### Environment Variable Override
 Configuration can be overridden via environment variables using ASP.NET Core's hierarchical configuration system (e.g., `AdGuardHomeHA__AdGuardHome__BaseUrl`).

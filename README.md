@@ -117,6 +117,9 @@ docker-compose ps
 | `Priority` | Lower number = higher priority | Required |
 | `TimeoutMs` | Ping timeout in milliseconds (ping mode) | 5000 |
 | `DnsRewrites` | Array of domains to manage | Required |
+| `GatusEndpointNames` | Full Gatus keys: `"<group>_<name>"` (Gatus mode) | `[]` |
+| `GatusInstanceUrls` | URLs of Gatus instances to poll (Gatus mode) | `[]` |
+| `RequiredGatusEndpoints` | Minimum healthy endpoints required (Gatus mode) | 1 |
 
 ### Monitoring Configuration (Ping Services Only)
 

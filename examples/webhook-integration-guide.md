@@ -13,9 +13,17 @@ This guide covers everything you need to know about integrating Gatus with AdGua
 AdGuard Home HA actively polls Gatus instances using the Gatus API:
 
 1. **Polling**: AdGuard Home HA makes HTTP requests to `http://gatus-instance:8080/api/v1/endpoints/statuses`
-2. **Status Parsing**: Gatus returns endpoint statuses in JSON format
-3. **Health Calculation**: AdGuard Home HA aggregates endpoint health based on `RequiredGatusEndpoints` threshold
-4. **DNS Updates**: DNS rewrites are updated when service health changes
+2. **Status Parsing**: Gatus returns endpoint statuses in JSON format using keys like `"<GROUP>_<NAME>"`
+3. **Key Matching**: AdGuard Home HA looks up endpoints using full Gatus keys (not just names)
+4. **Health Calculation**: AdGuard Home HA aggregates endpoint health based on `RequiredGatusEndpoints` threshold
+5. **DNS Updates**: DNS rewrites are updated when service health changes
+
+### Important: Gatus Key Format
+
+Gatus internally uses keys in the format `"<GROUP_NAME>_<ENDPOINT_NAME>"` where:
+- Special characters (` `, `/`, `_`, `,`, `.`, `#`) are replaced with `-`
+- **Example**: `name: "web-check"` + `group: "production"` = key `"production_web-check"`
+- **Your config must use the full key**: `"GatusEndpointNames": ["production_web-check"]`
 
 ## Configuration
 
@@ -33,7 +41,7 @@ Configure services in `appsettings.json` with Gatus polling:
         "IpAddress": "192.168.1.100",
         "Priority": 1,
         "DnsRewrites": ["web.example.com"],
-        "GatusEndpointNames": ["primary-web-check", "secondary-web-check"],
+        "GatusEndpointNames": ["production_primary-web-check", "production_secondary-web-check"],
         "GatusInstanceUrls": ["http://gatus-1:8080", "http://gatus-2:8080"],
         "RequiredGatusEndpoints": 1
       },
@@ -43,7 +51,7 @@ Configure services in `appsettings.json` with Gatus polling:
         "IpAddress": "192.168.1.101",
         "Priority": 2,
         "DnsRewrites": ["web.example.com"],
-        "GatusEndpointNames": ["backup-web-check"],
+        "GatusEndpointNames": ["production_backup-web-check"],
         "GatusInstanceUrls": ["http://gatus-1:8080"],
         "RequiredGatusEndpoints": 1
       }
@@ -67,7 +75,8 @@ Configure services in `appsettings.json` with Gatus polling:
 **Primary Gatus Machine:**
 ```yaml
 endpoints:
-  - name: "primary-web-check"  # Must match GatusEndpointNames
+  - name: "primary-web-check"  # Key: production_primary-web-check
+    group: "production"
     url: "http://192.168.1.100:8080/health"
     interval: 30s
     conditions:
@@ -75,6 +84,7 @@ endpoints:
       - "[RESPONSE_TIME] < 2000"
         
   - name: "backup-web-check"
+    group: "production"         # Key: production_backup-web-check
     url: "http://192.168.1.101:8080/health"
     interval: 30s
     conditions:
@@ -85,7 +95,8 @@ endpoints:
 **Secondary Gatus Machine (for redundancy):**
 ```yaml
 endpoints:
-  - name: "secondary-web-check"  # Must match GatusEndpointNames
+  - name: "secondary-web-check"  # Key: production_secondary-web-check
+    group: "production"
     url: "http://192.168.1.100:8080/health"  # Same service, different monitor
     interval: 30s
     conditions:

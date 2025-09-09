@@ -43,7 +43,7 @@
         "DnsRewrites": [
           "db.yourdomain.com"
         ],
-        "GatusEndpointNames": ["gatus-db-1", "gatus-db-2"],
+        "GatusEndpointNames": ["production_gatus-db-1", "production_gatus-db-2"],
         "GatusInstanceUrls": ["http://gatus-1:8080", "http://gatus-2:8080"],
         "RequiredGatusEndpoints": 1
       }

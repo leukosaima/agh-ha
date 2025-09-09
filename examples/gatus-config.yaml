@@ -3,11 +3,12 @@
 # AdGuard Home HA will poll the Gatus API directly, no webhooks needed
 
 # Endpoints to monitor
-# IMPORTANT: Endpoint names must match "GatusEndpointNames" in AdGuard Home HA config
-# AdGuard Home HA will poll these endpoints via Gatus API
+# IMPORTANT: Use groups to organize endpoints. AdGuard Home HA will reference them using the
+# full key format: "<GROUP_NAME>_<ENDPOINT_NAME>"
 endpoints:
-  # Primary web service monitoring
-  - name: "primary-web-check"  # Matches GatusEndpointNames in service config
+  # Production web service monitoring
+  - name: "primary-web-check"  
+    group: "production"          # Key: production_primary-web-check
     url: "http://192.168.1.100:8080/health"
     method: GET
     interval: 30s
@@ -18,6 +19,7 @@ endpoints:
 
   # Secondary web service for redundancy  
   - name: "secondary-web-check"
+    group: "production"          # Key: production_secondary-web-check
     url: "http://192.168.1.100:8080/health"  # Same service, different monitor
     method: GET
     interval: 30s
@@ -28,6 +30,7 @@ endpoints:
 
   # Backup service monitoring
   - name: "backup-web-check"
+    group: "production"          # Key: production_backup-web-check  
     url: "http://192.168.1.101:8080/health"
     method: GET
     interval: 30s
@@ -38,6 +41,7 @@ endpoints:
 
   # API service with JSON response validation
   - name: "api-service-check"
+    group: "production"          # Key: production_api-service-check
     url: "https://api.example.com/health"
     method: GET
     interval: 45s
@@ -49,6 +53,7 @@ endpoints:
 
   # External website monitoring
   - name: "external-web-check"
+    group: "external"            # Key: external_external-web-check
     url: "https://www.example.com"
     method: GET
     interval: 60s
@@ -59,8 +64,9 @@ endpoints:
     # No alerts needed - AdGuard Home HA polls the status directly
 
 # Configuration Tips:
-# 1. Use descriptive endpoint names that identify the monitoring source
-# 2. Set intervals based on your SLA requirements (30s for critical services)
-# 3. Adjust response time thresholds based on your infrastructure
-# 4. Use multiple endpoints per service for redundancy
-# 5. Match endpoint names exactly with AdGuard Home HA configuration
+# 1. Use groups to organize endpoints logically (production, staging, external, etc.)
+# 2. AdGuard Home HA references endpoints using full keys: "<GROUP_NAME>_<ENDPOINT_NAME>"
+# 3. Special characters (space, /, _, ,, ., #) in groups/names are replaced with "-"
+# 4. Set intervals based on your SLA requirements (30s for critical services)
+# 5. Use multiple endpoints per service for redundancy
+# 6. Example: name="web-check" + group="prod" = key="prod_web-check"
