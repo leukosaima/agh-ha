@@ -153,7 +153,7 @@ public class ServiceHealthMonitor : IServiceHealthMonitor
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error pinging IP {IpAddress}", ipAddress);
+            _logger.LogWarning("Error pinging IP {IpAddress}: {ErrorMessage}", ipAddress, ex.Message);
             return false;
         }
     }

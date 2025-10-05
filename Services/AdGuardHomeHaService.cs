@@ -94,7 +94,7 @@ public class AdGuardHomeHaService : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error in ping monitoring loop");
+                    _logger.LogWarning("Error in ping monitoring loop: {ErrorMessage}", ex.Message);
                     
                     // Wait a shorter interval before retrying on error
                     try
@@ -157,7 +157,7 @@ public class AdGuardHomeHaService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during health check cycle");
+            _logger.LogWarning("Error during health check cycle: {ErrorMessage}", ex.Message);
         }
     }
 
@@ -178,7 +178,7 @@ public class AdGuardHomeHaService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error handling service status change for {ServiceName}", serviceName);
+            _logger.LogWarning("Error handling service status change for {ServiceName}: {ErrorMessage}", serviceName, ex.Message);
         }
     }
 
@@ -194,7 +194,7 @@ public class AdGuardHomeHaService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating DNS rewrites for service {ServiceName}", service.Name);
+            _logger.LogWarning("Error updating DNS rewrites for service {ServiceName}: {ErrorMessage}", service.Name, ex.Message);
         }
     }
 
@@ -229,7 +229,7 @@ public class AdGuardHomeHaService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating DNS rewrite for domain {Domain}", domain);
+            _logger.LogWarning("Error updating DNS rewrite for domain {Domain}: {ErrorMessage}", domain, ex.Message);
         }
     }
 
@@ -252,7 +252,7 @@ public class AdGuardHomeHaService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating DNS rewrites for all services");
+            _logger.LogWarning("Error updating DNS rewrites for all services: {ErrorMessage}", ex.Message);
         }
     }
 

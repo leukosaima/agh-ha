@@ -35,9 +35,14 @@ public class DnsRewriteManager : IDnsRewriteManager
 
             _logger.LogInformation("DNS rewrite manager initialized successfully");
         }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError("Failed to initialize DNS rewrite manager: {ErrorMessage}", ex.Message);
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to initialize DNS rewrite manager");
+            _logger.LogError("Failed to initialize DNS rewrite manager: {ErrorMessage}", ex.Message);
             throw;
         }
     }
@@ -93,7 +98,7 @@ public class DnsRewriteManager : IDnsRewriteManager
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating rewrite {Domain} -> {IpAddress}", domain, targetIpAddress);
+            _logger.LogWarning("Error updating rewrite {Domain} -> {IpAddress}: {ErrorMessage}", domain, targetIpAddress, ex.Message);
             return false;
         }
     }

@@ -128,7 +128,7 @@ public class GatusPollingHealthMonitor : IGatusPollingHealthMonitor
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during Gatus polling");
+            _logger.LogWarning("Error during Gatus polling: {ErrorMessage}", ex.Message);
             if (_updateSemaphore.CurrentCount == 0)
             {
                 _updateSemaphore.Release();
@@ -162,8 +162,8 @@ public class GatusPollingHealthMonitor : IGatusPollingHealthMonitor
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error polling endpoint {EndpointName} from Gatus instance {GatusUrl}",
-                        endpointName, gatusUrl);
+                    _logger.LogWarning("Error polling endpoint {EndpointName} from Gatus instance {GatusUrl}: {ErrorMessage}",
+                        endpointName, gatusUrl, ex.Message);
                 }
             }
         }
@@ -226,9 +226,14 @@ public class GatusPollingHealthMonitor : IGatusPollingHealthMonitor
             _logger.LogWarning("Timeout polling Gatus instance {GatusUrl} for endpoint {EndpointName}", gatusUrl, endpointName);
             return null;
         }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning("Error getting endpoint status from Gatus {GatusUrl}: {ErrorMessage}", gatusUrl, ex.Message);
+            return null;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting endpoint status from Gatus {GatusUrl}", gatusUrl);
+            _logger.LogWarning("Error getting endpoint status from Gatus {GatusUrl}: {ErrorMessage}", gatusUrl, ex.Message);
             return null;
         }
     }

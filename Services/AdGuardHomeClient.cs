@@ -56,9 +56,14 @@ public class AdGuardHomeClient : IAdGuardHomeClient
             _logger.LogWarning("Failed to connect to AdGuard Home: {StatusCode}", response.StatusCode);
             return false;
         }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning("Error testing connection to AdGuard Home: {ErrorMessage}", ex.Message);
+            return false;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error testing connection to AdGuard Home");
+            _logger.LogWarning("Error testing connection to AdGuard Home: {ErrorMessage}", ex.Message);
             return false;
         }
     }
@@ -85,9 +90,14 @@ public class AdGuardHomeClient : IAdGuardHomeClient
             _logger.LogWarning("Failed to get rewrites: {StatusCode}", response.StatusCode);
             return Array.Empty<RewriteEntry>();
         }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning("Error getting rewrites from AdGuard Home: {ErrorMessage}", ex.Message);
+            return Array.Empty<RewriteEntry>();
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting rewrites from AdGuard Home");
+            _logger.LogWarning("Error getting rewrites from AdGuard Home: {ErrorMessage}", ex.Message);
             return Array.Empty<RewriteEntry>();
         }
     }
@@ -120,9 +130,14 @@ public class AdGuardHomeClient : IAdGuardHomeClient
                 domain, ipAddress, response.StatusCode);
             return false;
         }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning("Error adding rewrite {Domain} -> {IpAddress}: {ErrorMessage}", domain, ipAddress, ex.Message);
+            return false;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error adding rewrite {Domain} -> {IpAddress}", domain, ipAddress);
+            _logger.LogWarning("Error adding rewrite {Domain} -> {IpAddress}: {ErrorMessage}", domain, ipAddress, ex.Message);
             return false;
         }
     }
@@ -155,9 +170,14 @@ public class AdGuardHomeClient : IAdGuardHomeClient
                 domain, ipAddress, response.StatusCode);
             return false;
         }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning("Error deleting rewrite {Domain} -> {IpAddress}: {ErrorMessage}", domain, ipAddress, ex.Message);
+            return false;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting rewrite {Domain} -> {IpAddress}", domain, ipAddress);
+            _logger.LogWarning("Error deleting rewrite {Domain} -> {IpAddress}: {ErrorMessage}", domain, ipAddress, ex.Message);
             return false;
         }
     }
@@ -199,9 +219,14 @@ public class AdGuardHomeClient : IAdGuardHomeClient
             
             return addSuccess;
         }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning("Error updating rewrite {Domain} -> {IpAddress}: {ErrorMessage}", domain, newIpAddress, ex.Message);
+            return false;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating rewrite {Domain} -> {IpAddress}", domain, newIpAddress);
+            _logger.LogWarning("Error updating rewrite {Domain} -> {IpAddress}: {ErrorMessage}", domain, newIpAddress, ex.Message);
             return false;
         }
     }
@@ -319,9 +344,15 @@ public class AdGuardHomeClient : IAdGuardHomeClient
             _sessionCookie = "retry";
             return false;
         }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning("Error authenticating with AdGuard Home: {ErrorMessage}", ex.Message);
+            _sessionCookie = "retry";
+            return false;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error authenticating with AdGuard Home");
+            _logger.LogWarning("Error authenticating with AdGuard Home: {ErrorMessage}", ex.Message);
             _sessionCookie = "retry";
             return false;
         }
