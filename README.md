@@ -1,60 +1,39 @@
-# AdGuard Home High Availability (HA)
+﻿# AdGuard Home High Availability (HA)
 
-A .NET 9 Docker container application that provides high availability for AdGuard Home DNS rewrites by monitoring multiple machines and automatically switching DNS entries to available targets.
+AdGuard Home HA is a containerized .NET background service that keeps AdGuard Home DNS rewrites pointed at the highest-priority healthy target.
+
+It monitors a set of services (each service owns one IP address plus the DNS rewrites it should serve) and automatically fails over when health changes.
 
 ## Features
-
-### Core Capabilities
-- **Automatic Failover**: Monitors services and switches DNS rewrites to healthy targets
-- **Priority-Based Selection**: Configure service priorities for preferred failover order  
-- **REST API Integration**: Direct integration with AdGuard Home's REST API
-- **Docker Support**: Containerized application for easy deployment
-- **Structured Logging**: Comprehensive logging for monitoring and troubleshooting
-
-### Monitoring Modes
-- **Ping Monitoring**: Traditional ICMP ping-based health checking (simple setup)
-- **Gatus Polling**: Advanced Gatus integration with API polling for comprehensive health checks
-- **Configurable Health Checks**: Customizable intervals, retry attempts, and timeouts
-
-## How It Works
-
-1. **Service Monitoring**: Monitors configured services via ping or Gatus API polling to check availability
-2. **DNS Management**: Automatically updates AdGuard Home DNS rewrites based on service health
-3. **Failover Logic**: When a service becomes unavailable, switches DNS to the next healthy service with highest priority
-4. **Automatic Recovery**: When a higher-priority service recovers, automatically switches back
+- Automatic failover for AdGuard Home DNS rewrites
+- Per-domain, priority-based target selection (lowest `Priority` wins)
+- Health checks via:
+  - `Ping` (ICMP)
+  - `Gatus` (polling the Gatus API)
+- Runs as a Docker container (no ports exposed)
 
 ## Prerequisites
+- Docker + Docker Compose v2 (`docker compose`)
+- An AdGuard Home instance (API reachable from the container)
 
-- Docker and Docker Compose
-- Access to an AdGuard Home instance
-- Network connectivity to monitor target machines
+## Quick start (Docker)
 
-## Quick Start
-
-### 1. Clone and Configure
-
+### 1) Copy templates
 ```bash
-git clone https://github.com/leukosaima/agh-ha.git
-cd agh-ha
-
-# Copy and customize configuration files
 cp .env.example .env
 cp config/appsettings.production.json.example config/appsettings.production.json
 ```
 
-### 2. Edit Configuration
-
-Edit the `.env` file:
-
+### 2) Configure AdGuard Home credentials
+Edit `.env`:
 ```bash
-# AdGuard Home Configuration
 ADGUARD_BASE_URL=http://your-adguard-home:3000
 ADGUARD_USERNAME=admin
 ADGUARD_PASSWORD=your-secure-password
 ```
 
-Edit `config/appsettings.production.json` for basic ping monitoring:
-
+### 3) Configure services + DNS rewrites
+Edit `config/appsettings.production.json`. Minimal example:
 ```json
 {
   "AdGuardHomeHA": {
@@ -65,233 +44,65 @@ Edit `config/appsettings.production.json` for basic ping monitoring:
     },
     "Services": [
       {
-        "Name": "Primary Server",
+        "Name": "Primary",
         "MonitoringMode": "Ping",
         "IpAddress": "192.168.1.100",
         "Priority": 1,
         "TimeoutMs": 5000,
-        "DnsRewrites": [
-          "www.yourdomain.com",
-          "api.yourdomain.com"
-        ]
+        "DnsRewrites": ["service.example.com"]
       },
       {
-        "Name": "Backup Server",
+        "Name": "Backup",
         "MonitoringMode": "Ping",
         "IpAddress": "192.168.1.101",
         "Priority": 2,
-        "DnsRewrites": [
-          "www.yourdomain.com",
-          "api.yourdomain.com"
-        ]
+        "TimeoutMs": 5000,
+        "DnsRewrites": ["service.example.com"]
       }
     ]
   }
 }
 ```
 
-> **For Gatus polling integration**: See `examples/gatus-integration-guide.md`
-
-### 3. Deploy
-
+### 4) Start
 ```bash
-# Build and start
-docker-compose up -d
+docker compose up -d --build
+```
+(If you use the legacy plugin, `docker-compose up -d --build` also works.)
 
-# Check logs
-docker-compose logs -f adguard-home-ha
-
-# Check health
-docker-compose ps
+### 5) Logs / status
+```bash
+docker compose logs -f adguard-home-ha
+docker compose ps
 ```
 
-## Configuration Reference
+## Monitoring modes
 
-### Service Configuration
+### Ping
+Ping checks are executed by calling the `ping` binary with Linux flags. For ping monitoring, run the app in the provided Linux container (recommended) or another Linux environment (e.g. WSL).
 
-| Property | Description | Default |
-|----------|-------------|---------|
-| `Name` | Friendly name for the service | Required |
-| `MonitoringMode` | "Ping" or "Gatus" | Required |
-| `IpAddress` | IP address to monitor and target | Required |
-| `Priority` | Lower number = higher priority | Required |
-| `TimeoutMs` | Ping timeout in milliseconds (ping mode) | 5000 |
-| `DnsRewrites` | Array of domains to manage | Required |
-| `GatusEndpointNames` | Full Gatus keys: `"<group>_<name>"` (Gatus mode) | `[]` |
-| `GatusInstanceUrls` | URLs of Gatus instances to poll (Gatus mode) | `[]` |
-| `RequiredGatusEndpoints` | Minimum healthy endpoints required (Gatus mode) | 1 |
+### Gatus (API polling)
+For advanced health checks (HTTP/TCP/etc.), configure a service with `MonitoringMode: "Gatus"` plus:
+- `GatusEndpointNames` (full Gatus keys: `<group>_<name>`)
+- `GatusInstanceUrls` (one or more Gatus base URLs)
+- `RequiredGatusEndpoints` (threshold)
 
-### Monitoring Configuration (Ping Services Only)
-
-| Property | Description | Default |
-|----------|-------------|---------|
-| `CheckIntervalSeconds` | Seconds between ping health checks | 30 |
-| `RetryAttempts` | Number of ping retries per check | 3 |
-| `RetryDelayMs` | Delay between retry attempts | 1000 |
-
-**Note**: This configuration is only used for services with `MonitoringMode: "Ping"`. Gatus services use their own `GatusPolling` configuration.
-
-### Gatus Polling Configuration (Gatus Services Only)
-
-| Property | Description | Default |
-|----------|-------------|---------|
-| `IntervalSeconds` | Seconds between Gatus API polls | 30 |
-| `TimeoutSeconds` | HTTP timeout for Gatus API calls | 10 |
-
-**Note**: This configuration is only used for services with `MonitoringMode: "Gatus"`.
-
-### AdGuard Home Configuration
-
-| Property | Description |
-|----------|-------------|
-| `BaseUrl` | AdGuard Home API base URL |
-| `Username` | Admin username |
-| `Password` | Admin password |
-
-## DNS Rewrites
-
-The application manages DNS rewrites in AdGuard Home for the configured domains. When a machine becomes unavailable:
-
-1. All configured DNS rewrites are updated to point to the next available machine
-2. The application prioritizes machines by their `Priority` value (lower = higher priority)
-3. Changes are logged and can be monitored
-
-## Logging
-
-The application provides structured logging with different levels:
-
-- **Debug**: Detailed operation information
-- **Information**: General operation status
-- **Warning**: Non-critical issues (e.g., single machine down)  
-- **Error**: Operation failures
-- **Critical**: Service-affecting issues (e.g., no healthy machines)
-
-## Docker Deployment Options
-
-### Option 1: Docker Compose (Recommended)
-
-```bash
-docker-compose up -d
-```
-
-### Option 2: Standalone Docker
-
-```bash
-# Build
-docker build -t adguard-home-ha .
-
-# Run with configuration
-docker run -d \\
-  --name adguard-home-ha \\
-  --restart unless-stopped \\
-  -v $(pwd)/config/appsettings.production.json:/app/appsettings.Production.json:ro \\
-  -e DOTNET_ENVIRONMENT=Production \\
-  adguard-home-ha
-```
-
-### Option 3: Environment Variables Only
-
-```bash
-docker run -d \\
-  --name adguard-home-ha \\
-  --restart unless-stopped \\
-  -e DOTNET_ENVIRONMENT=Production \\
-  -e AdGuardHomeHA__AdGuardHome__BaseUrl=http://adguard-home:3000 \\
-  -e AdGuardHomeHA__AdGuardHome__Username=admin \\
-  -e AdGuardHomeHA__AdGuardHome__Password=yourpassword \\
-  adguard-home-ha
-```
-
-## Advanced Monitoring
-
-### Gatus API Integration
-
-For advanced monitoring beyond basic ping checks, AdGuard Home HA integrates with [Gatus](https://github.com/TwinProduction/gatus) via API polling:
-
-- **Active polling** - Continuously polls Gatus instances for endpoint health status
-- **Redundant monitoring** - Multiple Gatus instances provide monitoring redundancy  
-- **Complex health checks** - HTTP, TCP, DNS, and custom condition support
-- **Reliable detection** - No dependency on webhook delivery or state changes
-
-📖 **Full Setup Guide**: [`examples/gatus-integration-guide.md`](examples/gatus-integration-guide.md)
-
-## Health Monitoring
-
-The container includes health checks that monitor the application process:
-
-```bash
-# Check container health
-docker inspect --format='{{.State.Health.Status}}' adguard-home-ha
-
-# View health check logs  
-docker inspect --format='{{range .State.Health.Log}}{{.Output}}{{end}}' adguard-home-ha
-```
+See `examples/gatus-integration-guide.md` for a full walkthrough.
 
 ## Troubleshooting
+- `Configuration validation failed`: check that `AdGuardHomeHA:Services` is not empty and each service has `Name`, `IpAddress`, `Priority`, and `DnsRewrites`.
+- Cannot connect/authenticate to AdGuard Home: verify `ADGUARD_BASE_URL` and credentials; confirm the API is reachable from inside the container.
+- Ping services always unhealthy: ensure ICMP is allowed from the container host to your targets.
+- Gatus endpoints not found: make sure `GatusEndpointNames` uses the endpoint key format (`<group>_<name>`), not just the display name.
 
-### Common Issues
-
-**Connection Failed to AdGuard Home**
-- Verify the BaseUrl is accessible from the container
-- Check username/password credentials
-- Ensure AdGuard Home API is enabled
-
-**Machines Not Responding to Ping**
-- Verify IP addresses are correct
-- Check network connectivity from container
-- Adjust timeout values if needed
-
-**DNS Rewrites Not Updating**  
-- Check AdGuard Home API credentials
-- Verify the domains exist or can be created
-- Review application logs for API errors
-
-### Debugging
-
-Enable debug logging by setting the log level:
-
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "AdGuardHomeHA": "Debug"
-    }
-  }
-}
-```
-
-Or via environment variable:
-```bash
--e Logging__LogLevel__AdGuardHomeHA=Debug
-```
-
-## Architecture
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   AdGuard HA    │────│   AdGuard Home   │────│   DNS Clients   │
-│   Container     │    │                  │    │                 │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-         │
-         ├── Ping ──────► Machine 1 (Priority 1)
-         │
-         └── Ping ──────► Machine 2 (Priority 2)
-```
+## References
+- AdGuard Home: https://github.com/AdguardTeam/AdGuardHome
+- Gatus: https://github.com/TwinProduction/gatus
 
 ## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make changes and add tests
-4. Submit a pull request
+PRs welcome.
 
 ## License
+MIT
 
-This project is licensed under the MIT License.
 
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section
-2. Review application logs
-3. Create an issue with logs and configuration details
