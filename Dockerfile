@@ -1,5 +1,5 @@
 # Build stage
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine@sha256:16fcd544bb71edae6abee5b2ea25bc5f372734f18568d81c64ebac74d6f00239 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine@sha256:732cd42c6f659814c9804ad7b05c7f761e83ef8379c5b2fdc3af673353caff73 AS build
 WORKDIR /src
 
 # Copy project file and restore dependencies
@@ -14,7 +14,7 @@ RUN dotnet publish "AdGuardHomeHA.csproj" \
     -o /app/publish
 
 # Runtime stage - .NET runtime image (console application)
-FROM mcr.microsoft.com/dotnet/runtime:10.0-alpine@sha256:55b227d1334f40be5aa2fcfe8e67bafeb5f3763f6232b421cc82975bd2d98e47 AS final
+FROM mcr.microsoft.com/dotnet/runtime:10.0-alpine@sha256:5cceea0ea5da4f96f9607e0640b3e74f5bba90a630ec107666771f001240672f AS final
 
 # Install dependencies and create non-root user
 # iputils-ping installs a proper ping binary with setuid root
